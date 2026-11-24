@@ -1,0 +1,8 @@
+node_modules/
+.env
+.auraboost-demo/
+*.log
+.vscode/
+.idea/
+legacy-electron/dist/
+legacy-electron/node_modules/

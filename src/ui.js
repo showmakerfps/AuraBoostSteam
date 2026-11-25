@@ -410,6 +410,8 @@ function renderAccount() {
     for (const input of form.querySelectorAll('input, button')) input.disabled = working;
   }
   $('guardCodeFields').hidden = !guardLogin?.codeAllowed || guardLogin?.status === 'connecting';
+  $('guardQR').hidden = !guardLogin?.qr || guardLogin?.status !== 'waiting';
+  $('officialQR').disabled = working;
   $('cancelGuard').disabled = working || guardLogin?.status === 'connecting';
   $('unlinkSession').hidden = waiting || (!connected && !account?.sessionLinked && !reconnecting);
   $('sessionState').textContent = account?.connectionStatus === 'paused' ? 'Steam informa que la cuenta está en uso en otro cliente.' : connected ? 'Sesión de Steam conectada.' : waiting ? 'Esperando Steam Guard.' : reconnecting ? 'Recuperando sesión automáticamente…' : account?.sessionLinked ? 'Steam requiere una nueva autorización.' : 'Sesión no conectada.';
@@ -934,15 +936,30 @@ function setLoginMode(mode) {
 }
 $('openSession').addEventListener('click', () => {
   loginAccountId = selectedId;
-  setLoginMode('manual');
+  setLoginMode('qr');
   $('loginSteamDialog').showModal();
 });
 $('manualMethod').addEventListener('click', () => setLoginMode('manual'));
 $('qrMethod').addEventListener('click', () => setLoginMode('qr'));
-$('officialQR').addEventListener('click', () => void linkAccount());
+$('officialQR').addEventListener('click', () => {
+  const id = loginAccountId ?? selectedId;
+  if (!id) return;
+  void accountAction('session:' + id, async () => {
+    const result = await request(accountPath(id) + '/session', {method:'POST',body:{method:'qr'}});
+    receiveGuardState(id,result);
+  });
+});
 $('cancelLogin').addEventListener('click', () => $('loginSteamDialog').close());
 $('loginSteamDialog').addEventListener('close', () => { $('steamPassword').value = ''; });
 $('steamGuard').addEventListener('input', event => { event.target.value = event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10); });
+function drawSteamQR(rows) {
+  if (!Array.isArray(rows) || rows.length < 21 || rows.length > 177 || !rows.every(r => typeof r === 'string' && r.length === rows.length && /^[01]+$/.test(r))) return;
+  const canvas = $('qrCanvas'); const ctx = canvas.getContext('2d');
+  const scale = Math.max(3, Math.floor(240 / (rows.length + 8)));
+  canvas.width = canvas.height = (rows.length + 8) * scale;
+  ctx.fillStyle = '#fff'; ctx.fillRect(0,0,canvas.width,canvas.height); ctx.fillStyle = '#111';
+  rows.forEach((row,y) => [...row].forEach((bit,x) => { if(bit === '1') ctx.fillRect((x+4)*scale,(y+4)*scale,scale,scale); }));
+}
 function receiveGuardState(id, result) {
   if (result.status === 'connected') {
     guardLogin = undefined; clearTimeout(guardPollTimer);
@@ -955,7 +972,8 @@ function receiveGuardState(id, result) {
     void refresh(); renderAccount(); return;
   }
   guardLogin = {...result, accountId:id};
-  $('guardMessage').textContent = result.status === 'connecting' ? 'Autorización recibida. Conectando con Steam…' : result.mobile ? 'Confirmá el inicio de sesión en la aplicación Steam del celular. Se conectará automáticamente. También podés usar un código si Steam lo permite.' : result.codeAllowed ? 'Ingresá el código de Steam Guard.' : 'Esperando autorización de Steam…';
+  if (result.qr) drawSteamQR(result.qr);
+  $('guardMessage').textContent = result.status === 'connecting' ? 'Autorización recibida. Conectando con Steam…' : result.qr ? 'Abrí Steam Guard en el celular, escaneá el código y confirmá el acceso.' : result.mobile ? 'Confirmá el inicio de sesión en la aplicación Steam del celular. Se conectará automáticamente. También podés usar un código si Steam lo permite.' : result.codeAllowed ? 'Ingresá el código de Steam Guard.' : 'Esperando autorización de Steam…';
   renderAccount(); scheduleGuardPoll();
 }
 function scheduleGuardPoll() {

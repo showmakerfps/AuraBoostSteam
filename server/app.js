@@ -418,17 +418,19 @@ function createApp(config, options = {}) {
     const actor = req.actor;
     const account = await store.getAccount(actor, accountId);
     if (!account) return problem(res, 404, 'No se encontró esa cuenta de Steam.');
+    const method = req.body?.method ?? 'manual';
+    if (!['manual','qr'].includes(method)) return problem(res,400,'Método inválido.');
     const accountName = typeof req.body?.accountName === 'string' ? req.body.accountName.trim() : '';
     const password = req.body?.password;
-    if (!/^[\w.-]{3,64}$/.test(accountName)) return problem(res, 400, 'Ingresá un usuario de Steam válido.');
-    if (typeof password !== 'string' || !password || password.length > 128) return problem(res, 400, 'Ingresá la contraseña de Steam.');
+    if (method === 'manual' && !/^[\w.-]{3,64}$/.test(accountName)) return problem(res, 400, 'Ingresá un usuario de Steam válido.');
+    if (method === 'manual' && (typeof password !== 'string' || !password || password.length > 128)) return problem(res, 400, 'Ingresá la contraseña de Steam.');
     try {
       const result = await clients.login(accountId, actor.id, accountName, password, async () => {
         if (clients.steamIdOf(accountId) !== accountId) throw new Error('Identidad incorrecta.');
         if (!await store.setSessionLinked(actor, accountId, true)) throw new Error('No se pudo guardar la sesión.');
         clients.configure?.(accountId, (await store.getAccount(actor, accountId))?.config);
         publish({accountId});
-      });
+      }, method);
       publish({accountId});
       res.json(result);
     } catch (error) { return problem(res, error.status ?? 400, error.message); }

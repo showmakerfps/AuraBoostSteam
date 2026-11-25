@@ -2,6 +2,7 @@
 
 const { randomBytes } = require('node:crypto');
 const SteamUser = require('steam-user');
+const qrcode = require('qrcode-generator');
 const { LoginSession, EAuthTokenPlatformType, EAuthSessionGuardType } = require('steam-session');
 
 const PENDING_TTL = 5 * 60_000;
@@ -87,7 +88,7 @@ function createSteamSessions({ tokens, onState, onError, Client = SteamUser, Aut
       configure(steamId, configurations.get(steamId) ?? {});
       if (client.auraPendingToken) { saveToken(steamId, client, client.auraPendingToken); delete client.auraPendingToken; }
       const appid = playing.get(steamId);
-      if (appid) { client.gamesPlayed([appid]); activity.set(steamId, new Date().toISOString()); }
+      if (appid && !suspended.has(steamId) && !client.playingState?.blocked) { client.gamesPlayed([appid]); activity.set(steamId, new Date().toISOString()); }
       notify();
     });
     client.on('refreshToken', refreshToken => {
@@ -106,7 +107,7 @@ function createSteamSessions({ tokens, onState, onError, Client = SteamUser, Aut
       if (clients.get(steamId) !== client) return;
       connectedIds.delete(steamId); pauseActivity(steamId);
       connection.set(steamId, suspended.has(steamId) ? 'needs-auth' : durable.has(steamId) ? 'reconnecting' : 'needs-auth');
-      if (durable.has(steamId) && !suspended.has(steamId)) scheduleRetry(steamId, client);
+      // steam-user already retries non-fatal disconnects; do not race its own reconnection.
       onError?.({ steamId, message: 'Steam desconectado (resultado ' + String(eresult ?? 'desconocido') + ').' });
       notify();
     });
@@ -137,17 +138,17 @@ function createSteamSessions({ tokens, onState, onError, Client = SteamUser, Aut
     client.on('error', error => {
       if (clients.get(steamId) !== client) return;
       connectedIds.delete(steamId); pauseActivity(steamId);
-      const fatal = [5, 63, 65, 85, 86, 88].includes(error?.eresult) || error?.eresult === SteamUser.EResult.LogonSessionReplaced || error?.eresult === SteamUser.EResult.LoggedInElsewhere;
-      if (fatal) { suspended.add(steamId); cancelRetry(steamId); connection.set(steamId, 'needs-auth'); }
-      else if (durable.has(steamId)) scheduleRetry(steamId, client);
-      else connection.set(steamId, 'needs-auth');
+      // With native autoRelogin, errors are terminal unless explicitly transient.
+      const transient = [SteamUser.EResult.NoConnection, SteamUser.EResult.ServiceUnavailable, SteamUser.EResult.Timeout, SteamUser.EResult.Busy, SteamUser.EResult.TryAnotherCM].filter(Number.isInteger).includes(error?.eresult);
+      if (transient && durable.has(steamId) && !suspended.has(steamId)) scheduleRetry(steamId, client);
+      else { suspended.add(steamId); cancelRetry(steamId); connection.set(steamId, 'needs-auth'); }
       onError?.({ steamId, message: describe(error).message + ' (resultado ' + String(error?.eresult ?? 'desconocido') + ')' });
       notify();
     });
   }
 
   function create(steamId, userId) {
-    const client = new Client({ autoRelogin: false, renewRefreshTokens: true, dataDirectory: null });
+    const client = new Client({ autoRelogin: true, renewRefreshTokens: true });
     connection.set(steamId, 'connecting');
     client.auraUserId = userId;
     clients.set(steamId, client);
@@ -169,7 +170,7 @@ function createSteamSessions({ tokens, onState, onError, Client = SteamUser, Aut
   }
 
   function authView(entry) {
-    return { loginId: entry.loginId, status: entry.status, mobile: entry.mobile === true, codeAllowed: entry.codeAllowed === true, message: entry.message ?? '' };
+    return { loginId: entry.loginId, status: entry.status, mobile: entry.mobile === true, codeAllowed: entry.codeAllowed === true, message: entry.message ?? '', qr: entry.status === 'waiting' ? entry.qr ?? null : null };
   }
   function cancelAuth(steamId) {
     const entry = pending.get(steamId);
@@ -177,10 +178,12 @@ function createSteamSessions({ tokens, onState, onError, Client = SteamUser, Aut
     pending.delete(steamId);
     clearTimeout(entry.timer);
     try { entry.session.cancelLoginAttempt(); } catch {}
+    if (!isConnected(steamId) && connection.get(steamId) === 'authorizing') connection.set(steamId,'needs-auth');
+    notify();
   }
   function failAuth(steamId, entry, message) {
-    if (pending.get(steamId) !== entry) return;
-    entry.status = 'error';
+    if (pending.get(steamId) !== entry || entry.status === 'connected' || entry.status === 'error') return;
+    entry.status = 'error'; entry.qr = null;
     entry.message = message;
     clearTimeout(entry.timer);
     try { entry.session.cancelLoginAttempt(); } catch {}
@@ -192,14 +195,14 @@ function createSteamSessions({ tokens, onState, onError, Client = SteamUser, Aut
     if (!entry || entry.loginId !== loginId) return {status:'error', message:'La solicitud ya no está disponible. Volvé a conectar.'};
     return authView(entry);
   }
-  async function login(steamId, userId, accountName, password, onConnected) {
+  async function login(steamId, userId, accountName, password, onConnected, method = 'manual') {
     if (isConnected(steamId)) return {status:'connected'};
     const existing = pending.get(steamId);
     if (existing && ['waiting','connecting'].includes(existing.status)) return authView(existing);
     cancelAuth(steamId);
     const auth = new AuthSession(EAuthTokenPlatformType.SteamClient);
     auth.loginTimeout = PENDING_TTL;
-    const entry = {loginId:randomId(), session:auth, status:'waiting', mobile:false, codeAllowed:false};
+    const entry = {loginId:randomId(), session:auth, status:'waiting', mobile:method === 'qr', codeAllowed:false, qr:null};
     pending.set(steamId, entry);
     manuallyDisconnected.delete(steamId);
     connection.set(steamId, 'authorizing');
@@ -220,6 +223,8 @@ function createSteamSessions({ tokens, onState, onError, Client = SteamUser, Aut
         if (previous) { try { previous.logOff(); } catch {} }
         const client = create(steamId, userId);
         const token = auth.refreshToken;
+        // Replace the previous token only after this authorization is verified.
+        durable.set(steamId,{userId,token});
         await new Promise((resolve, reject) => {
           const timeout = setTimeout(() => finish(new Error('Steam no abrió la sesión del cliente.')), 45000);
           function finish(error) {
@@ -236,10 +241,12 @@ function createSteamSessions({ tokens, onState, onError, Client = SteamUser, Aut
         });
         if (pending.get(steamId) !== entry || entry.status !== 'connecting' || !isConnected(steamId)) return;
         // Store only the verified token for this account, never its password.
-        if (!durable.has(steamId) || durable.get(steamId).token !== token) {
-          await tokens.save(steamId, userId, durable.get(steamId)?.token ?? token);
-        } else { await flushTokens(steamId); await tokens.save(steamId,userId,durable.get(steamId)?.token ?? token); }
-        if (!durable.has(steamId)) durable.set(steamId,{userId,token});
+        await flushTokens(steamId);
+        if (pending.get(steamId) !== entry || !isConnected(steamId)) return;
+        // Queue the write so a concurrent manual disconnect can wait before deleting it.
+        const write = tokens.save(steamId,userId,durable.get(steamId)?.token ?? token);
+        tokenWrites.set(steamId,write);
+        try { await write; } finally { if(tokenWrites.get(steamId) === write) tokenWrites.delete(steamId); }
         if (pending.get(steamId) !== entry || !isConnected(steamId)) return;
         await onConnected?.();
         if (pending.get(steamId) !== entry) return;
@@ -251,15 +258,21 @@ function createSteamSessions({ tokens, onState, onError, Client = SteamUser, Aut
       });
     });
     try {
-      const result = await auth.startWithCredentials({accountName,password});
+      const result = method === 'qr' ? await auth.startWithQR() : await auth.startWithCredentials({accountName,password});
       if (pending.get(steamId) !== entry) return {status:'error', message:'Solicitud cancelada.'};
-      if (auth.steamID?.getSteamID64() !== steamId) {
+      if (method !== 'qr' && auth.steamID?.getSteamID64() !== steamId) {
         failAuth(steamId, entry, 'El usuario ingresado no corresponde a la cuenta seleccionada.');
         return authView(entry);
       }
       const types = (result.validActions ?? []).map(action => action.type);
-      entry.mobile = types.includes(EAuthSessionGuardType.DeviceConfirmation) || types.includes(EAuthSessionGuardType.EmailConfirmation);
-      entry.codeAllowed = types.includes(EAuthSessionGuardType.DeviceCode) || types.includes(EAuthSessionGuardType.EmailCode);
+      entry.mobile = method === 'qr' || types.includes(EAuthSessionGuardType.DeviceConfirmation) || types.includes(EAuthSessionGuardType.EmailConfirmation);
+      entry.codeAllowed = method !== 'qr' && (types.includes(EAuthSessionGuardType.DeviceCode) || types.includes(EAuthSessionGuardType.EmailCode));
+      if (method === 'qr' && entry.status === 'waiting') {
+        const challenge = new URL(result.qrChallengeUrl);
+        if (challenge.protocol !== 'https:' || challenge.hostname !== 's.team' || challenge.username || challenge.password) throw new Error('QR inválido.');
+        const qr = qrcode(0,'M'); qr.addData(challenge.href); qr.make();
+        entry.qr = Array.from({length:qr.getModuleCount()},(_,row) => Array.from({length:qr.getModuleCount()},(_,col) => qr.isDark(row,col) ? '1' : '0').join(''));
+      }
       notify(); return authView(entry);
     } catch (error) { failAuth(steamId, entry, describe(error).message); return authView(entry); }
   }

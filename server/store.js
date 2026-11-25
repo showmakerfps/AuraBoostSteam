@@ -20,7 +20,7 @@ class StoreError extends Error {
 }
 
 function defaultConfig() {
-  return { title: '', description: '', reply: '', selected: [], favorites: [], profiles: [], autoSend: false };
+  return { title: '', description: '', reply: '', selected: [], favorites: [], profiles: [], autoSend: false, persona: 'online' };
 }
 
 function toAccount(row) {
@@ -460,15 +460,17 @@ function createSteamTokenStore({ supabaseUrl, supabaseSecretKey, encryptionKey, 
     async all() {
       const [rows, active] = await Promise.all([
         request(steamTokenTable, { token, query: { select: 'steam_id,user_id,encrypted_token' } }),
-        request(accountTable, { token, query: { select: 'steam_id,playing_appid', playing_appid: 'not.is.null' } })
+        request(accountTable, { token, query: { select: 'steam_id,playing_appid,session_linked,config' } })
       ]);
-      const activeById = new Map(active.map(row => [row.steam_id, row.playing_appid]));
-      return rows.map(row => ({
-        steamId: row.steam_id,
-        userId: row.user_id,
-        token: cipher.decrypt(row.encrypted_token, row.steam_id),
-        appid: activeById.get(row.steam_id) ?? null
-      }));
+      const activeById = new Map(active.filter(row => row.session_linked).map(row => [row.steam_id, row]));
+      const restored = [];
+      for (const row of rows) {
+        const account = activeById.get(row.steam_id);
+        if (!account) continue;
+        try { restored.push({ steamId: row.steam_id, userId: row.user_id, token: cipher.decrypt(row.encrypted_token, row.steam_id), appid: account.playing_appid ?? null, config: account.config }); }
+        catch { console.warn('No se pudo descifrar un token de Steam; la cuenta necesita reconexión.'); }
+      }
+      return restored;
     },
     async syncWithKey(steamId, snapshot) {
       await request(accountTable, {

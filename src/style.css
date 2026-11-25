@@ -363,3 +363,18 @@ dialog h2 { font-size: 21px; margin-bottom: 10px; }
   *, *::before, *::after { scroll-behavior: auto !important; animation: none !important; transition: none !important; }
   .dot.on { box-shadow: 0 0 7px #43ef85; }
 }
+/* Keep the library controls outside its scrolling list. */
+@media (min-width: 821px) {
+  .shell { height: 100dvh; min-height: 0; overflow: hidden; }
+  .workspace { grid-template-rows: minmax(0, 1fr); }
+  .center, .app, main, #library { min-height: 0; }
+  #library { flex: 1 1 0; }
+  #library .game-list { flex: 1 1 0; overflow-y: auto; }
+}
+.selected-tray { flex: none; display: flex; flex-wrap: wrap; gap: 6px; max-height: 90px; overflow-y: auto; padding-bottom: 8px; }
+.selected-chip { background: #302044; border-color: #624187; font-size: 12px; min-height: 30px; padding: 4px 8px; }
+.active-sessions { display: grid; gap: 8px; margin-bottom: 18px; }
+.active-session { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; border: 1px solid var(--edge); border-radius: 9px; padding: 10px; }
+.session-timer { margin-left: auto; font-variant-numeric: tabular-nums; color: #c493ff; }
+#guardDialog form { display: grid; margin-top: 14px; gap: 10px; }
+#guardDialog input { font-size: 16px; letter-spacing: 1px; }

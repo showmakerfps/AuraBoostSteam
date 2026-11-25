@@ -29,6 +29,8 @@ function settingsPatch(body) {
       patch[key] = value;
     } else if (['selected', 'favorites'].includes(key) && idListValid(value)) {
       patch[key] = [...new Set(value)];
+    } else if (key === 'persona' && ['online','away','busy','snooze','offline'].includes(value)) {
+      patch[key] = value;
     } else if (key === 'autoSend' && typeof value === 'boolean') {
       patch[key] = value;
     } else if (key === 'profiles' && Array.isArray(value) && value.length <= 30 &&
@@ -327,7 +329,7 @@ function createApp(config, options = {}) {
   app.get('/api/state', async (req, res) => {
     const [accounts, settings] = await Promise.all([store.listAccounts(req.actor), store.getSettings(req.actor)]);
     res.json({
-      accounts: accounts.map(account => ({ ...account, sessionConnected: clients.isConnected(account.id) })),
+      accounts: accounts.map(account => ({ ...account, sessionConnected: clients.isConnected(account.id), activitySince: clients.activitySince?.(account.id) ?? null })),
       settings, mock: config.mock, steamConfigured: Boolean(config.steamApiKey || config.mock)
     });
   });
@@ -356,7 +358,7 @@ function createApp(config, options = {}) {
     if (!data) return problem(res, 404, 'No se encontrÃ³ esa cuenta de Steam.');
     const { config, games, ...account } = data;
     res.json({
-      account: { ...account, sessionConnected: clients.isConnected(req.params.id) },
+      account: { ...account, sessionConnected: clients.isConnected(req.params.id), activitySince: clients.activitySince?.(req.params.id) ?? null },
       config, games, history: await store.listHistory(req.actor, req.params.id)
     });
   });
@@ -365,7 +367,9 @@ function createApp(config, options = {}) {
     const patch = settingsPatch(req.body);
     if (!patch) return problem(res, 400, 'Los ajustes contienen valores invÃ¡lidos.');
     const accountId = req.params.id;
-    if (!await store.updateSettings(req.actor, accountId, patch)) return problem(res, 404, 'No se encontrÃ³ esa cuenta de Steam.');
+    const updated = await store.updateSettings(req.actor, accountId, patch);
+    if (!updated) return problem(res, 404, 'No se encontró esa cuenta de Steam.');
+    clients.configure?.(accountId, updated.config ?? patch);
     if (patch.autoSend === true) {
       await store.addHistory(req.actor, { id: accountId, text: 'EnvÃ­o automÃ¡tico activado.' }).catch(() => {});
     }
@@ -377,7 +381,8 @@ function createApp(config, options = {}) {
     const accountId = req.params.id;
     if (!await store.removeAccount(req.actor, accountId)) return problem(res, 404, 'No se encontrÃ³ esa cuenta de Steam.');
     clients.disconnect(accountId);
-    await tokens.delete(accountId).catch(() => {});
+    await clients.flushTokens?.(accountId);
+    await tokens.delete(accountId);
     publish({ accountId, deleted: true });
     replyOk(res);
   });
@@ -425,19 +430,30 @@ function createApp(config, options = {}) {
       clients.disconnect(accountId);
       return problem(res, 400, 'Esa cuenta de Steam no coincide con la vinculada.');
     }
-    if (result.status === 'connected') await store.setSessionLinked(req.actor, accountId, true);
+    if (result.status === 'connected') {
+      await store.setSessionLinked(req.actor, accountId, true);
+      clients.configure?.(accountId, (await store.getAccount(req.actor, accountId))?.config);
+    }
     publish({ accountId });
     res.json(result);
   });
 
   app.post('/api/accounts/:id/session/guard', syncLimit, async (req, res) => {
     const accountId = req.params.id;
+    if (!await store.getAccount(req.actor, accountId)) return problem(res, 404, 'No se encontró esa cuenta de Steam.');
     const loginId = typeof req.body?.loginId === 'string' ? req.body.loginId : '';
     const code = typeof req.body?.code === 'string' ? req.body.code.trim() : '';
     if (!/^[A-Za-z0-9]{5,10}$/.test(code)) return problem(res, 400, 'IngresÃ¡ el cÃ³digo de Steam Guard.');
     try {
       const result = await clients.guard(accountId, loginId, code);
-      if (result.status === 'connected') await store.setSessionLinked(req.actor, accountId, true);
+      if (result.status === 'connected' && clients.steamIdOf(accountId) !== accountId) {
+        clients.disconnect(accountId);
+        return problem(res, 400, 'La cuenta de Steam no coincide con la vinculada.');
+      }
+      if (result.status === 'connected') {
+        await store.setSessionLinked(req.actor, accountId, true);
+        clients.configure?.(accountId, (await store.getAccount(req.actor, accountId))?.config);
+      }
       publish({ accountId });
       res.json(result);
     } catch (error) {
@@ -447,8 +463,11 @@ function createApp(config, options = {}) {
 
   app.delete('/api/accounts/:id/session', async (req, res) => {
     const accountId = req.params.id;
+    if (!await store.getAccount(req.actor, accountId)) return problem(res, 404, 'No se encontró esa cuenta de Steam.');
     clients.disconnect(accountId);
-    await tokens.delete(accountId).catch(() => {});
+    await clients.flushTokens?.(accountId);
+    await tokens.delete(accountId);
+    await store.setPlaying(req.actor, accountId, null);
     await store.setSessionLinked(req.actor, accountId, false);
     publish({ accountId });
     replyOk(res);

@@ -5,8 +5,8 @@ const buttons = selector => [...document.querySelectorAll(selector)];
 const number = new Intl.NumberFormat('es-AR', { maximumFractionDigits: 1 });
 const date = new Intl.DateTimeFormat('es-AR', { dateStyle: 'medium', timeStyle: 'short' });
 const year = new Intl.DateTimeFormat('es-AR', { year: 'numeric' });
-const fields = ['title', 'description', 'reply'];
-const emptyConfig = { selected: [], favorites: [], profiles: [], title: '', description: '', reply: '', autoSend: false };
+const fields = ['title', 'description', 'reply', 'persona'];
+const emptyConfig = { selected: [], favorites: [], profiles: [], title: '', description: '', reply: '', autoSend: false, persona: 'online' };
 const logo = '/icon.png';
 const steamSignIn = 'https://community.fastly.steamstatic.com/public/images/signinthroughsteam/sits_01.png';
 const accountStatuses = {
@@ -24,6 +24,7 @@ let session = {};
 let dashboard = {};
 let selectedId;
 let filter = 'all';
+let activePage = 'library';
 let stream;
 let connectionTimer;
 let refreshTimer;
@@ -118,6 +119,7 @@ function showApp() {
   $('app').hidden = false;
   $('nav').hidden = false;
   $('logout').hidden = false;
+  showPage(activePage);
   render();
 }
 
@@ -171,6 +173,7 @@ function clearPrivateState() {
 async function bootstrap(notice = '', returned = {}) {
   const version = ++authVersion;
   stopEvents();
+  const previousSession = session;
   const wasAuthenticated = session.authenticated;
   session = {};
   try {
@@ -193,6 +196,13 @@ async function bootstrap(notice = '', returned = {}) {
     showGate(session.recovery ? 'password' : 'login', authError ? 'No se pudo usar el enlace. IniciÃ¡ sesiÃ³n o solicitÃ¡ uno nuevo.' : notice, authError);
   } catch (error) {
     if (version !== authVersion) return;
+    if (wasAuthenticated && error.status !== 401) {
+      session = previousSession;
+      setConnection('Reconectando con AuraBoost');
+      setToast('Conexión temporalmente no disponible.');
+      window.setTimeout(() => { if (version === authVersion) void bootstrap(); }, 5000);
+      return;
+    }
     if (wasAuthenticated) clearPrivateState();
     showGate('login', labelText(error), true);
   }
@@ -332,6 +342,9 @@ function changeConfig(patch) {
 }
 
 function showPage(page) {
+  if (!Object.hasOwn(pageCopy, page)) return;
+  activePage = page;
+  $('libraryMetrics').hidden = page !== 'library';
   const [heading, subtitle] = pageCopy[page];
   $('pageTitle').textContent = heading;
   $('subtitle').textContent = subtitle;
@@ -377,16 +390,22 @@ function renderAccount() {
   const waiting = guardLogin?.accountId === selectedId;
   $('sessionBlock').hidden = !currentData();
   $('sessionForm').hidden = connected || waiting;
-  $('guardForm').hidden = !waiting;
-  $('unlinkSession').hidden = !connected;
+  const guardDialog = $('guardDialog');
+  if (waiting && !guardDialog.open && session.authenticated) guardDialog.showModal();
+  else if (!waiting && guardDialog.open) guardDialog.close();
+  const working = busy.has('session:' + selectedId) || busy.has('guard:' + selectedId);
+  for (const form of [$('sessionForm'), $('guardForm')]) {
+    for (const input of form.querySelectorAll('input, button')) input.disabled = working;
+  }
+  $('unlinkSession').hidden = !connected && !account?.sessionLinked;
   $('sessionState').textContent = connected
     ? 'SesiÃ³n de Steam conectada.'
     : waiting ? 'Steam pidiÃ³ un cÃ³digo de Steam Guard.' : 'ConectÃ¡ la sesiÃ³n para iniciar juegos y contar horas.';
-  $('autoSend').checked = config.autoSend === true;
+  $('autoSend').checked = (drafts.get(selectedId)?.autoSend ?? config.autoSend) === true;
 
   const draft = drafts.get(selectedId);
   for (const field of fields) {
-    const next = draft?.[field] ?? config[field] ?? '';
+    const next = draft?.[field] ?? config[field] ?? emptyConfig[field] ?? '';
     if ($(field).value !== next) $(field).value = next;
   }
   $('saveAccount').disabled = !draft || busy.has('save:' + selectedId);
@@ -518,7 +537,7 @@ function playButton(account, game) {
       await request(accountPath(id) + (playing ? '/stop' : '/launch'), {
         method: 'POST', body: playing ? {} : { appid: game.id }
       });
-      setToast(playing ? 'Juego detenido.' : 'Cuenta en juego. Steam estÃ¡ contando las horas.');
+      setToast(playing ? 'Juego detenido.' : 'Actividad solicitada a Steam.');
       await refresh();
     });
   });
@@ -557,6 +576,16 @@ function renderGames() {
   const config = configFor(selectedId);
   const selected = new Set(config.selected);
   const favorites = new Set(config.favorites);
+  const tray = $('selectedTray');
+  tray.hidden = selected.size === 0;
+  tray.replaceChildren(...[...selected].map(id => {
+    const game = games.find(item => item.id === id);
+    const chip = element('button', 'selected-chip', (game?.name ?? ('AppID ' + id)) + ' ×');
+    chip.type = 'button';
+    chip.title = 'Quitar de la selección';
+    chip.addEventListener('click', () => toggleGame('selected', id));
+    return chip;
+  }));
   const counts = { all: games.length, selected: selected.size, favorites: favorites.size };
   for (const button of buttons('[data-filter]')) {
     const key = button.dataset.filter;
@@ -639,6 +668,19 @@ function asDate(value) {
 }
 
 function renderHistory() {
+  const active = (dashboard.accounts ?? []).filter(account => account.playing);
+  $('activeSessions').replaceChildren(...active.map(account => {
+    const row = element('div', 'active-session');
+    const game = details.get(account.id)?.games?.find(game => game.id === account.playing.appid);
+    row.append(element('strong', '', account.name), element('span', '', game?.name ?? ('AppID ' + account.playing.appid)));
+    const timer = element('span', 'session-timer', account.sessionConnected ? 'Calculando…' : 'Sin conexión');
+    if (account.sessionConnected && account.activitySince) timer.dataset.since = account.activitySince;
+    else if (account.sessionConnected) timer.textContent = 'Tiempo no disponible';
+    row.append(timer);
+    return row;
+  }));
+  if (!active.length) $('activeSessions').append(element('p', 'muted', 'No hay sesiones de juego registradas.'));
+  tickActivity();
   const refreshed = asDate(currentAccount()?.syncedAt);
   $('sync').textContent = refreshed ? 'Ãšltima sincronizaciÃ³n Â· ' + date.format(refreshed) : 'Sin sincronizar';
   const history = currentData()?.history ?? [];
@@ -655,6 +697,16 @@ function renderHistory() {
   }));
   if (!history.length) $('logs').append(element('li', 'muted', 'TodavÃ­a no hay actividad registrada.'));
 }
+
+function tickActivity() {
+  for (const node of buttons('[data-since]')) {
+    const start = Date.parse(node.dataset.since);
+    if (!Number.isFinite(start)) continue;
+    const n = Math.max(0, Math.floor((Date.now() - start) / 1000));
+    node.textContent = [Math.floor(n/3600), Math.floor(n/60)%60, n%60].map(x => String(x).padStart(2,'0')).join(':');
+  }
+}
+window.setInterval(tickActivity, 1000);
 
 function safeNavigation(value, kind) {
   const url = new URL(value, window.location.origin);
@@ -724,9 +776,9 @@ function removeAccount() {
 
 function updateDraft() {
   if (!selectedId) return;
-  const changes = Object.fromEntries(fields.map(field => [field, $(field).value]));
+  const changes = { ...Object.fromEntries(fields.map(field => [field, $(field).value])), autoSend: $('autoSend').checked };
   const config = configFor(selectedId);
-  if (fields.some(field => changes[field] !== config[field])) drafts.set(selectedId, changes);
+  if ([...fields, 'autoSend'].some(field => changes[field] !== (config[field] ?? emptyConfig[field]))) drafts.set(selectedId, changes);
   else drafts.delete(selectedId);
   $('saveAccount').disabled = !drafts.has(selectedId) || busy.has('save:' + selectedId);
 }
@@ -885,7 +937,8 @@ $('guardForm').addEventListener('submit', event => {
     });
     $('steamGuard').value = '';
     guardLogin = result.status === 'guard' ? { accountId: id, loginId: result.loginId } : undefined;
-    if (result.status === 'connected') setToast('SesiÃ³n de Steam conectada.');
+    if (result.status === 'connected') setToast('Sesión de Steam conectada.');
+    else $('guardMessage').textContent = 'Revisá el código e intentá nuevamente.';
     await refresh();
   });
 });
@@ -900,8 +953,18 @@ $('unlinkSession').addEventListener('click', () => {
   });
 });
 
-$('autoSend').addEventListener('change', () => {
-  void changeConfig({ autoSend: $('autoSend').checked });
+$('autoSend').addEventListener('change', updateDraft);
+$('persona').addEventListener('change', updateDraft);
+$('guardDialog').addEventListener('cancel', event => event.preventDefault());
+$('cancelGuard').addEventListener('click', () => {
+  const id = guardLogin?.accountId;
+  if (!id) return;
+  void accountAction('guard:' + id, async () => {
+    await request(accountPath(id) + '/session', { method: 'DELETE' });
+    guardLogin = undefined;
+    $('steamGuard').value = '';
+    await refresh();
+  });
 });
 
 $('profileForm').addEventListener('submit', async event => {

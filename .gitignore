@@ -6,3 +6,5 @@ node_modules/
 .idea/
 legacy-electron/dist/
 legacy-electron/node_modules/
+.data/
+.tmp/

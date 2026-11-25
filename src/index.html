@@ -21,13 +21,13 @@
             <small>Private Cloud Â· v0.2.0</small>
           </div>
         </div>
-        <nav id="nav" aria-label="Secciones">
+        <nav id="nav" aria-label="Secciones" hidden>
           <button type="button" data-page="library" aria-current="page">Biblioteca</button>
           <button type="button" data-page="profiles">Perfiles</button>
           <button type="button" data-page="stats">Actividad</button>
           <button type="button" data-page="settings">Ajustes</button>
         </nav>
-        <button id="logout" class="logout" type="button">Cerrar sesiÃ³n</button>
+        <button id="logout" class="logout" type="button" hidden>Cerrar sesiÃ³n</button>
       </header>
 
       <main id="main" tabindex="-1">
@@ -35,7 +35,7 @@
           <div class="panel gate-card"><p>Comprobando la sesiÃ³nâ€¦</p></div>
         </section>
 
-        <section id="gate" class="gate" aria-labelledby="authTitle">
+        <section id="gate" class="gate" aria-labelledby="authTitle" hidden>
           <div class="panel gate-card">
             <div class="gate-heading">
               <img src="/icon.png" width="52" height="52" alt="">
@@ -69,7 +69,7 @@
           </div>
         </section>
 
-        <section id="app" class="app" aria-labelledby="pageTitle">
+        <section id="app" class="app" aria-labelledby="pageTitle" hidden>
           <div class="page-header">
             <div>
               <h1 id="pageTitle">Biblioteca</h1>
@@ -82,7 +82,7 @@
 
           <div class="workspace">
             <div class="center">
-              <div class="metrics" aria-label="Resumen de la biblioteca">
+              <div class="metrics" id="libraryMetrics" aria-label="Resumen de la biblioteca">
                 <article><i aria-hidden="true">â—‡</i><div><small>Juegos</small><strong id="count">0</strong></div></article>
                 <article><i aria-hidden="true">â—·</i><div><small>Horas registradas</small><strong id="hours">â€”</strong></div></article>
                 <article><i aria-hidden="true">â–£</i><div><small>SelecciÃ³n</small><strong id="selectedMetric">0</strong></div></article>
@@ -117,6 +117,7 @@
                     </select>
                   </div>
                 </div>
+                <div id="selectedTray" class="selected-tray" aria-label="Juegos seleccionados" hidden></div>
                 <div id="games" class="game-list" role="region" aria-label="Lista de juegos" tabindex="0"><div class="empty"><div class="symbol" aria-hidden="true">â—‡</div><strong>Tu biblioteca, en un solo lugar</strong><p>VinculÃ¡ una cuenta de Steam para ver sus juegos.</p></div></div>
                 <div class="foot">
                   <span id="selectedCount" aria-live="polite">0 seleccionados</span>
@@ -125,7 +126,7 @@
                 </div>
               </section>
 
-              <section class="panel content alternate" id="profiles" aria-labelledby="profilesTitle">
+              <section class="panel content alternate" id="profiles" hidden aria-labelledby="profilesTitle">
                 <h2 id="profilesTitle">Selecciones guardadas</h2>
                 <p>GuardÃ¡ combinaciones de juegos de la cuenta elegida.</p>
                 <form id="profileForm" class="toolbar">
@@ -135,13 +136,15 @@
                 <div id="profileList"><p class="muted">TodavÃ­a no hay selecciones guardadas para esta cuenta.</p></div>
               </section>
 
-              <section class="panel content alternate" id="stats" aria-labelledby="activityTitle">
-                <h2 id="activityTitle">Historial de actividad</h2>
+              <section class="panel content alternate" id="stats" hidden aria-labelledby="activityTitle">
+                <h2 id="activityTitle">Sesiones activas</h2>
+                <div id="activeSessions" class="active-sessions"></div>
+                <h2>Historial de actividad</h2>
                 <p id="sync">Sin sincronizar</p>
                 <ol id="logs" class="logs"><li class="muted">TodavÃ­a no hay actividad registrada.</li></ol>
               </section>
 
-              <section class="panel content alternate" id="settings" aria-labelledby="settingsTitle">
+              <section class="panel content alternate" id="settings" hidden aria-labelledby="settingsTitle">
                 <h2 id="settingsTitle">Ajustes y seguridad</h2>
                 <p>El tÃ­tulo, la descripciÃ³n y el borrador se guardan por cuenta de Steam.</p>
                 <p class="notice">La presencia mostrada proviene de Steam. Las horas, la presencia y los mensajes se gestionan en Steam.</p>
@@ -182,15 +185,18 @@
                     <input id="steamPassword" type="password" placeholder="ContraseÃ±a" autocomplete="current-password" maxlength="128" required="">
                     <button class="primary" type="submit">Conectar sesiÃ³n</button>
                   </form>
-                  <form id="guardForm" class="toolbar" hidden>
-                    <input id="steamGuard" placeholder="CÃ³digo de Steam Guard" maxlength="10" required="">
+                  <dialog id="guardDialog" class="panel" aria-labelledby="guardTitle"><h2 id="guardTitle">Steam Guard</h2><p id="guardMessage">Ingresá el código de seguridad de Steam.</p><form id="guardForm" class="toolbar">
+                    <input id="steamGuard" placeholder="Código de Steam Guard" maxlength="10" autocomplete="one-time-code" required="">
                     <button class="primary" type="submit">Verificar</button>
-                  </form>
+                    <button id="cancelGuard" type="button">Cancelar</button>
+                  </form></dialog>
                   <p id="sessionState" class="muted"></p>
                   <button id="unlinkSession" class="text-button" type="button" hidden>Desconectar sesiÃ³n</button>
                 </div>
                 <hr>
                 <form id="accountForm">
+                  <label for="persona">Estado de Steam</label>
+                  <select id="persona"><option value="online">Conectado</option><option value="away">Ausente</option><option value="busy">Ocupado</option><option value="snooze">Inactivo</option><option value="offline">Desconectado (presencia)</option></select>
                   <label for="title">TÃ­tulo personalizado</label>
                   <div class="inputclear">
                     <input id="title" placeholder="Ej.: Mis juegos de estrategia" maxlength="64">
@@ -214,7 +220,7 @@
                   <textarea id="reply" rows="3" maxlength="500"></textarea>
                   <label class="switch"><input id="autoSend" type="checkbox"> EnvÃ­o automÃ¡tico</label>
                   <small class="muted">Guardado en AuraBoost.</small>
-                  <button id="saveAccount" type="submit" class="primary full" disabled="">Guardar cambios</button>
+                  <button id="saveAccount" type="submit" class="primary full" disabled="">Aplicar cambios</button>
                 </form>
               </div>
               <p id="libraryStatus" class="notice"></p>

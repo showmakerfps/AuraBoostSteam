@@ -415,52 +415,46 @@ function createApp(config, options = {}) {
   app.post('/api/accounts/:id/session', syncLimit, async (req, res) => {
     if (config.mock) return problem(res, 409, 'En modo demostración no se conectan sesiones reales.');
     const accountId = req.params.id;
-    if (!await store.getAccount(req.actor, accountId)) return problem(res, 404, 'No se encontró esa cuenta de Steam.');
+    const actor = req.actor;
+    const account = await store.getAccount(actor, accountId);
+    if (!account) return problem(res, 404, 'No se encontró esa cuenta de Steam.');
     const accountName = typeof req.body?.accountName === 'string' ? req.body.accountName.trim() : '';
     const password = req.body?.password;
     if (!/^[\w.-]{3,64}$/.test(accountName)) return problem(res, 400, 'Ingresá un usuario de Steam válido.');
     if (typeof password !== 'string' || !password || password.length > 128) return problem(res, 400, 'Ingresá la contraseña de Steam.');
-    let result;
     try {
-      result = await clients.login(accountId, req.actor.id, accountName, password);
-    } catch (error) {
-      return problem(res, error.status ?? 400, error.message);
-    }
-    if (result.status === 'connected' && clients.steamIdOf(accountId) !== accountId) {
-      clients.disconnect(accountId);
-      return problem(res, 400, 'Esa cuenta de Steam no coincide con la vinculada.');
-    }
-    if (result.status === 'connected') {
-      await clients.flushTokens?.(accountId);
-      await store.setSessionLinked(req.actor, accountId, true);
-      clients.configure?.(accountId, (await store.getAccount(req.actor, accountId))?.config);
-    }
-    publish({ accountId });
-    res.json(result);
+      const result = await clients.login(accountId, actor.id, accountName, password, async () => {
+        if (clients.steamIdOf(accountId) !== accountId) throw new Error('Identidad incorrecta.');
+        if (!await store.setSessionLinked(actor, accountId, true)) throw new Error('No se pudo guardar la sesión.');
+        clients.configure?.(accountId, (await store.getAccount(actor, accountId))?.config);
+        publish({accountId});
+      });
+      publish({accountId});
+      res.json(result);
+    } catch (error) { return problem(res, error.status ?? 400, error.message); }
   });
-
+  app.get('/api/accounts/:id/session/status', async (req, res) => {
+    const accountId = req.params.id;
+    if (!await store.getAccount(req.actor, accountId)) return problem(res,404,'No se encontró esa cuenta de Steam.');
+    const loginId = query(req).get('loginId') ?? '';
+    res.json(clients.loginStatus(accountId, loginId));
+  });
   app.post('/api/accounts/:id/session/guard', syncLimit, async (req, res) => {
     const accountId = req.params.id;
-    if (!await store.getAccount(req.actor, accountId)) return problem(res, 404, 'No se encontró esa cuenta de Steam.');
+    if (!await store.getAccount(req.actor, accountId)) return problem(res,404,'No se encontró esa cuenta de Steam.');
     const loginId = typeof req.body?.loginId === 'string' ? req.body.loginId : '';
-    const code = typeof req.body?.code === 'string' ? req.body.code.trim() : '';
-    if (!/^[A-Za-z0-9]{5,10}$/.test(code)) return problem(res, 400, 'Ingresá el código de Steam Guard.');
-    try {
-      const result = await clients.guard(accountId, loginId, code);
-      if (result.status === 'connected' && clients.steamIdOf(accountId) !== accountId) {
-        clients.disconnect(accountId);
-        return problem(res, 400, 'La cuenta de Steam no coincide con la vinculada.');
-      }
-      if (result.status === 'connected') {
-        await clients.flushTokens?.(accountId);
-        await store.setSessionLinked(req.actor, accountId, true);
-        clients.configure?.(accountId, (await store.getAccount(req.actor, accountId))?.config);
-      }
-      publish({ accountId });
-      res.json(result);
-    } catch (error) {
-      return problem(res, error.status ?? 400, error.message);
-    }
+    const code = typeof req.body?.code === 'string' ? req.body.code.trim().toUpperCase() : '';
+    if (!/^[A-Z0-9]{5,10}$/.test(code)) return problem(res,400,'Ingresá el código de Steam Guard.');
+    try { res.json(await clients.guard(accountId,loginId,code)); }
+    catch (error) { return problem(res,error.status ?? 400,error.message); }
+  });
+  app.post('/api/accounts/:id/session/cancel', async (req,res) => {
+    const accountId = req.params.id;
+    if (!await store.getAccount(req.actor,accountId)) return problem(res,404,'No se encontró esa cuenta de Steam.');
+    const state = clients.loginStatus(accountId,req.body?.loginId);
+    if (state.status === 'connecting') return problem(res,409,'Steam está terminando de conectar. Esperá el resultado.');
+    if (state.status === 'waiting') clients.cancelAuth(accountId);
+    publish({accountId}); replyOk(res);
   });
 
   app.delete('/api/accounts/:id/session', async (req, res) => {

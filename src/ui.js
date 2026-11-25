@@ -34,6 +34,8 @@ let refreshVersion = 0;
 let selectionWrites = Promise.resolve();
 let avatarKey;
 let guardLogin;
+let guardPollTimer;
+let guardPolling = false;
 let loginAccountId;
 let loginMode = 'manual';
 const details = new Map();
@@ -149,6 +151,7 @@ function clearPrivateState() {
   dashboard = {};
   selectedId = undefined;
   guardLogin = undefined;
+  clearTimeout(guardPollTimer);
   loginAccountId = undefined;
   if ($('loginSteamDialog').open) $('loginSteamDialog').close();
   refreshVersion += 1;
@@ -303,7 +306,9 @@ function currentData() {
 }
 
 function currentAccount() {
-  return currentData()?.account ?? dashboard.accounts?.find(account => account.id === selectedId);
+  const summary = dashboard.accounts?.find(account => account.id === selectedId);
+  const detail = currentData()?.account;
+  return summary || detail ? {...detail,...summary} : undefined;
 }
 
 function configFor(id) {
@@ -393,7 +398,7 @@ function renderAccount() {
   const connected = account?.sessionConnected === true;
   const waiting = guardLogin?.accountId === selectedId;
   $('sessionBlock').hidden = !currentData();
-  const reconnecting = account?.connectionStatus === 'reconnecting' || account?.connectionStatus === 'connecting';
+  const reconnecting = ['reconnecting','connecting','authorizing'].includes(account?.connectionStatus);
   $('openSession').hidden = !account || connected || waiting || reconnecting;
   $('sessionForm').hidden = loginMode !== 'manual';
   if ((connected || waiting) && $('loginSteamDialog').open) $('loginSteamDialog').close();
@@ -404,8 +409,10 @@ function renderAccount() {
   for (const form of [$('sessionForm'), $('guardForm')]) {
     for (const input of form.querySelectorAll('input, button')) input.disabled = working;
   }
-  $('unlinkSession').hidden = !connected && !account?.sessionLinked && !reconnecting;
-  $('sessionState').textContent = connected ? 'Sesión de Steam conectada.' : waiting ? 'Esperando Steam Guard.' : reconnecting ? 'Recuperando sesión automáticamente…' : account?.sessionLinked ? 'Steam requiere una nueva autorización.' : 'Sesión no conectada.';
+  $('guardCodeFields').hidden = !guardLogin?.codeAllowed || guardLogin?.status === 'connecting';
+  $('cancelGuard').disabled = working || guardLogin?.status === 'connecting';
+  $('unlinkSession').hidden = waiting || (!connected && !account?.sessionLinked && !reconnecting);
+  $('sessionState').textContent = account?.connectionStatus === 'paused' ? 'Steam informa que la cuenta está en uso en otro cliente.' : connected ? 'Sesión de Steam conectada.' : waiting ? 'Esperando Steam Guard.' : reconnecting ? 'Recuperando sesión automáticamente…' : account?.sessionLinked ? 'Steam requiere una nueva autorización.' : 'Sesión no conectada.';
   $('autoSend').checked = (drafts.get(selectedId)?.autoSend ?? config.autoSend) === true;
 
   const draft = drafts.get(selectedId);
@@ -521,16 +528,17 @@ function showEmptyLibrary() {
 
 function playButton(account, game) {
   const playing = account?.playing?.appid === game.id;
-  const ready = account?.sessionConnected === true;
+  const ready = account?.sessionConnected === true && account?.connectionStatus !== 'paused';
+  const id = account?.id;
+  const actionKey = 'play:' + id + ':' + game.id;
   const button = element('button', 'play' + (playing ? ' on' : ''), playing ? 'Detener' : 'Iniciar');
   button.type = 'button';
-  button.disabled = !ready || busy.has('play:' + game.id);
+  button.disabled = !id || (!ready && !playing) || busy.has(actionKey);
   button.title = ready ? '' : 'Conectá la sesión de Steam de esta cuenta';
   button.setAttribute('aria-label', (playing ? 'Detener ' : 'Iniciar ') + game.name);
   button.addEventListener('click', () => {
-    const id = selectedId;
     if (!id) return;
-    void accountAction('play:' + game.id, async () => {
+    void accountAction(actionKey, async () => {
       await request(accountPath(id) + (playing ? '/stop' : '/launch'), {
         method: 'POST', body: playing ? {} : { appid: game.id }
       });
@@ -935,35 +943,59 @@ $('officialQR').addEventListener('click', () => void linkAccount());
 $('cancelLogin').addEventListener('click', () => $('loginSteamDialog').close());
 $('loginSteamDialog').addEventListener('close', () => { $('steamPassword').value = ''; });
 $('steamGuard').addEventListener('input', event => { event.target.value = event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10); });
+function receiveGuardState(id, result) {
+  if (result.status === 'connected') {
+    guardLogin = undefined; clearTimeout(guardPollTimer);
+    setToast('Sesión de Steam conectada y autorizada.');
+    void refresh(); renderAccount(); return;
+  }
+  if (result.status === 'error') {
+    guardLogin = undefined; clearTimeout(guardPollTimer);
+    setToast(result.message || 'No se pudo completar la autorización.');
+    void refresh(); renderAccount(); return;
+  }
+  guardLogin = {...result, accountId:id};
+  $('guardMessage').textContent = result.status === 'connecting' ? 'Autorización recibida. Conectando con Steam…' : result.mobile ? 'Confirmá el inicio de sesión en la aplicación Steam del celular. Se conectará automáticamente. También podés usar un código si Steam lo permite.' : result.codeAllowed ? 'Ingresá el código de Steam Guard.' : 'Esperando autorización de Steam…';
+  renderAccount(); scheduleGuardPoll();
+}
+function scheduleGuardPoll() {
+  clearTimeout(guardPollTimer);
+  if (!guardLogin) return;
+  guardPollTimer = setTimeout(async () => {
+    const attempt = guardLogin;
+    if (!attempt || guardPolling) { scheduleGuardPoll(); return; }
+    guardPolling = true;
+    try {
+      const result = await request(accountPath(attempt.accountId) + '/session/status?loginId=' + encodeURIComponent(attempt.loginId));
+      if (guardLogin?.loginId === attempt.loginId) receiveGuardState(attempt.accountId,result);
+    } catch { if (guardLogin?.loginId === attempt.loginId) scheduleGuardPoll(); }
+    finally { guardPolling = false; }
+  }, 2500);
+}
 $('sessionForm').addEventListener('submit', event => {
   event.preventDefault();
   const id = loginAccountId ?? selectedId;
   if (!id) return;
+  const password = $('steamPassword').value;
+  $('steamPassword').value = '';
   void accountAction('session:' + id, async () => {
     const result = await request(accountPath(id) + '/session', {
-      method: 'POST', body: { accountName: $('steamUser').value.trim(), password: $('steamPassword').value }
+      method: 'POST', body: {accountName:$('steamUser').value.trim(),password}
     });
-    $('steamPassword').value = '';
-    guardLogin = result.status === 'guard' ? { accountId: id, loginId: result.loginId } : undefined;
-    setToast(result.status === 'guard' ? 'Ingresá el código de Steam Guard.' : 'Sesión de Steam conectada.');
+    receiveGuardState(id,result);
     await refresh();
-    if (result.status === 'guard') $('steamGuard').focus();
   });
 });
-
 $('guardForm').addEventListener('submit', event => {
   event.preventDefault();
-  const id = selectedId;
-  if (!id || !guardLogin) return;
-  void accountAction('guard:' + id, async () => {
-    const result = await request(accountPath(id) + '/session/guard', {
-      method: 'POST', body: { loginId: guardLogin.loginId, code: $('steamGuard').value.trim().toUpperCase() }
+  const attempt = guardLogin;
+  if (!attempt?.codeAllowed) return;
+  void accountAction('guard:' + attempt.accountId, async () => {
+    const result = await request(accountPath(attempt.accountId) + '/session/guard', {
+      method:'POST', body:{loginId:attempt.loginId,code:$('steamGuard').value.trim().toUpperCase()}
     });
     $('steamGuard').value = '';
-    guardLogin = result.status === 'guard' ? { accountId: id, loginId: result.loginId } : undefined;
-    if (result.status === 'connected') setToast('Sesión de Steam conectada.');
-    else $('guardMessage').textContent = 'Revisá el código e intentá nuevamente.';
-    await refresh();
+    if (guardLogin?.loginId === attempt.loginId) receiveGuardState(attempt.accountId,result);
   });
 });
 
@@ -981,11 +1013,11 @@ $('autoSend').addEventListener('change', updateDraft);
 $('persona').addEventListener('change', updateDraft);
 $('guardDialog').addEventListener('cancel', event => event.preventDefault());
 $('cancelGuard').addEventListener('click', () => {
-  const id = guardLogin?.accountId;
-  if (!id) return;
-  void accountAction('guard:' + id, async () => {
-    await request(accountPath(id) + '/session', { method: 'DELETE' });
-    guardLogin = undefined;
+  const attempt = guardLogin;
+  if (!attempt) return;
+  void accountAction('guard:' + attempt.accountId, async () => {
+    await request(accountPath(attempt.accountId) + '/session/cancel', {method:'POST',body:{loginId:attempt.loginId}});
+    guardLogin = undefined; clearTimeout(guardPollTimer);
     $('steamGuard').value = '';
     await refresh();
   });

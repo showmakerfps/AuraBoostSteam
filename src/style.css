@@ -392,3 +392,6 @@ dialog h2 { font-size: 21px; margin-bottom: 10px; }
 .login-methods button { flex: 1; font-size: 12px; }
 #loginSteamDialog form { display: grid; gap: 10px; }
 #steamGuard { text-transform: uppercase; }
+
+#guardCodeFields { display: grid; gap: 10px; }
+#guardMessage { line-height: 1.6; }

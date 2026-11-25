@@ -184,8 +184,8 @@
                     <button class="primary" type="submit">Conectar sesión</button>
                   </form><button id="cancelLogin" class="text-button full" type="button">Cancelar</button></dialog>
                   <dialog id="guardDialog" class="panel" aria-labelledby="guardTitle"><h2 id="guardTitle">Steam Guard</h2><p id="guardMessage">Ingresá el código de seguridad de Steam.</p><form id="guardForm" class="toolbar">
-                    <input id="steamGuard" autocapitalize="characters" spellcheck="false" placeholder="Código de Steam Guard" maxlength="10" autocomplete="one-time-code" required="">
-                    <button class="primary" type="submit">Verificar</button>
+                    <div id="guardCodeFields"><input id="steamGuard" autocapitalize="characters" spellcheck="false" placeholder="Código de Steam Guard" maxlength="10" autocomplete="one-time-code" required="">
+                    <button class="primary full" type="submit">Verificar código</button></div>
                     <button id="cancelGuard" type="button">Cancelar</button>
                   </form></dialog>
                   <p id="sessionState" class="muted"></p>

@@ -18,7 +18,7 @@
           <img src="/icon.png" width="42" height="42" alt="">
           <div>
             <strong>Aura<span>Boost</span></strong>
-            <small>Private Cloud Â· v0.2.0</small>
+            <small>Private Cloud · v0.2.0</small>
           </div>
         </div>
         <nav id="nav" aria-label="Secciones" hidden>
@@ -27,44 +27,44 @@
           <button type="button" data-page="stats">Actividad</button>
           <button type="button" data-page="settings">Ajustes</button>
         </nav>
-        <button id="logout" class="logout" type="button" hidden>Cerrar sesiÃ³n</button>
+        <button id="logout" class="logout" type="button" hidden>Cerrar sesión</button>
       </header>
 
       <main id="main" tabindex="-1">
         <section id="loading" class="gate" aria-live="polite">
-          <div class="panel gate-card"><p>Comprobando la sesiÃ³nâ€¦</p></div>
+          <div class="panel gate-card"><p>Comprobando la sesión…</p></div>
         </section>
 
         <section id="gate" class="gate" aria-labelledby="authTitle" hidden>
           <div class="panel gate-card">
             <div class="gate-heading">
               <img src="/icon.png" width="52" height="52" alt="">
-              <h1 id="authTitle">Iniciar sesiÃ³n</h1>
-              <p id="authIntro">AccedÃ© con tu cuenta autorizada de AuraBoost.</p>
+              <h1 id="authTitle">Iniciar sesión</h1>
+              <p id="authIntro">Accedé con tu cuenta autorizada de AuraBoost.</p>
             </div>
             <form id="loginForm">
-              <label for="loginEmail">Correo electrÃ³nico</label>
+              <label for="loginEmail">Correo electrónico</label>
               <input id="loginEmail" type="email" maxlength="254" autocomplete="username" required="">
-              <label for="loginPassword">ContraseÃ±a de AuraBoost</label>
+              <label for="loginPassword">Contraseña de AuraBoost</label>
               <input id="loginPassword" type="password" maxlength="1024" autocomplete="current-password" required="">
               <button type="submit" class="primary full">Entrar</button>
               <button id="google" type="button" class="full">Continuar con Google</button>
-              <button id="showRecovery" type="button" class="text-button full">OlvidÃ© mi contraseÃ±a</button>
+              <button id="showRecovery" type="button" class="text-button full">Olvidé mi contraseña</button>
             </form>
             <form id="recoveryForm">
-              <label for="recoveryEmail">Correo electrÃ³nico</label>
+              <label for="recoveryEmail">Correo electrónico</label>
               <input id="recoveryEmail" type="email" maxlength="254" autocomplete="email" required="">
-              <button type="submit" class="primary full">Enviar enlace de recuperaciÃ³n</button>
-              <button type="button" class="text-button full" data-login="">Volver al inicio de sesiÃ³n</button>
+              <button type="submit" class="primary full">Enviar enlace de recuperación</button>
+              <button type="button" class="text-button full" data-login="">Volver al inicio de sesión</button>
             </form>
             <form id="passwordForm">
-              <label for="newPassword">Nueva contraseÃ±a de AuraBoost</label>
+              <label for="newPassword">Nueva contraseña de AuraBoost</label>
               <input id="newPassword" type="password" minlength="8" maxlength="1024" autocomplete="new-password" required="">
-              <button type="submit" class="primary full">Guardar contraseÃ±a</button>
-              <button id="cancelRecovery" type="button" class="text-button full">Cancelar recuperaciÃ³n</button>
+              <button type="submit" class="primary full">Guardar contraseña</button>
+              <button id="cancelRecovery" type="button" class="text-button full">Cancelar recuperación</button>
             </form>
             <p id="authMessage" class="form-message" role="status"></p>
-            <p id="mockCredentials" class="notice">Modo local con datos simulados. Correo <code>demo@auraboost.local</code> Â· ContraseÃ±a <code>AuraBoost-local-2026</code>.</p>
+            <p id="mockCredentials" class="notice">Modo local con datos simulados. Correo <code>demo@auraboost.local</code> · Contraseña <code>AuraBoost-local-2026</code>.</p>
             <p class="gate-privacy"><a href="/privacidad">Privacidad</a></p>
           </div>
         </section>
@@ -73,7 +73,7 @@
           <div class="page-header">
             <div>
               <h1 id="pageTitle">Biblioteca</h1>
-              <p id="subtitle">OrganizÃ¡ los juegos de tus cuentas de Steam.</p>
+              <p id="subtitle">Organizá los juegos de tus cuentas de Steam.</p>
             </div>
             <div class="connection" aria-live="polite">
               <span id="dot" class="dot" aria-hidden="true"></span><span id="connection">Conectando con AuraBoost</span>
@@ -83,10 +83,10 @@
           <div class="workspace">
             <div class="center">
               <div class="metrics" id="libraryMetrics" aria-label="Resumen de la biblioteca">
-                <article><i aria-hidden="true">â—‡</i><div><small>Juegos</small><strong id="count">0</strong></div></article>
-                <article><i aria-hidden="true">â—·</i><div><small>Horas registradas</small><strong id="hours">â€”</strong></div></article>
-                <article><i aria-hidden="true">â–£</i><div><small>SelecciÃ³n</small><strong id="selectedMetric">0</strong></div></article>
-                <article><i aria-hidden="true">â˜†</i><div><small>Favoritos</small><strong id="favoriteMetric">0</strong></div></article>
+                <article><i aria-hidden="true">◇</i><div><small>Juegos</small><strong id="count">0</strong></div></article>
+                <article><i aria-hidden="true">◷</i><div><small>Horas registradas</small><strong id="hours">—</strong></div></article>
+                <article><i aria-hidden="true">▣</i><div><small>Selección</small><strong id="selectedMetric">0</strong></div></article>
+                <article><i aria-hidden="true">☆</i><div><small>Favoritos</small><strong id="favoriteMetric">0</strong></div></article>
               </div>
 
               <section class="panel content" id="library" aria-label="Biblioteca de juegos">
@@ -98,42 +98,42 @@
                   </div>
                   <div class="search-tools">
                     <div class="inputclear">
-                      <input id="search" type="search" placeholder="Buscar juegosâ€¦" aria-label="Buscar juegos" maxlength="120">
-                      <button id="clearSearch" type="button" title="Borrar bÃºsqueda" aria-label="Borrar bÃºsqueda">
+                      <input id="search" type="search" placeholder="Buscar juegos…" aria-label="Buscar juegos" maxlength="120">
+                      <button id="clearSearch" type="button" title="Borrar búsqueda" aria-label="Borrar búsqueda">
                         <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 5 10 10M15 5 5 15"></path></svg>
                       </button>
                     </div>
-                    <button id="scan" class="square-button" type="button" title="Sincronizar biblioteca" aria-label="Sincronizar biblioteca" disabled="" aria-busy="false">â†»</button>
+                    <button id="scan" class="square-button" type="button" title="Sincronizar biblioteca" aria-label="Sincronizar biblioteca" disabled="" aria-busy="false">↻</button>
                     <select id="sort" aria-label="Ordenar biblioteca">
-                      <option value="az">Nombre Aâ€“Z</option>
-                      <option value="za">Nombre Zâ€“A</option>
+                      <option value="az">Nombre A–Z</option>
+                      <option value="za">Nombre Z–A</option>
                       <option value="recent" data-game-field="recent" disabled="">Jugados recientemente</option>
-                      <option value="most" data-game-field="minutes" disabled="">MÃ¡s jugados</option>
+                      <option value="most" data-game-field="minutes" disabled="">Más jugados</option>
                       <option value="least" data-game-field="minutes" disabled="">Menos jugados</option>
-                      <option value="big" data-game-field="bytes" disabled="">Mayor tamaÃ±o</option>
-                      <option value="small" data-game-field="bytes" disabled="">Menor tamaÃ±o</option>
+                      <option value="big" data-game-field="bytes" disabled="">Mayor tamaño</option>
+                      <option value="small" data-game-field="bytes" disabled="">Menor tamaño</option>
                       <option value="new" data-game-field="release" disabled="">Lanzamientos nuevos</option>
                       <option value="old" data-game-field="release" disabled="">Lanzamientos antiguos</option>
                     </select>
                   </div>
                 </div>
-                <div id="selectedTray" class="selected-tray" aria-label="Juegos seleccionados" hidden></div>
-                <div id="games" class="game-list" role="region" aria-label="Lista de juegos" tabindex="0"><div class="empty"><div class="symbol" aria-hidden="true">â—‡</div><strong>Tu biblioteca, en un solo lugar</strong><p>VinculÃ¡ una cuenta de Steam para ver sus juegos.</p></div></div>
+                <section id="quickActivity" class="quick-activity" aria-label="Juegos en ejecución" hidden><h2>En ejecución</h2><div id="quickSessions" class="active-sessions"></div></section>
+                <div id="games" class="game-list" role="region" aria-label="Lista de juegos" tabindex="0"><div class="empty"><div class="symbol" aria-hidden="true">◇</div><strong>Tu biblioteca, en un solo lugar</strong><p>Vinculá una cuenta de Steam para ver sus juegos.</p></div></div>
                 <div class="foot">
                   <span id="selectedCount" aria-live="polite">0 seleccionados</span>
                   <button id="selectAll" type="button" disabled="">Seleccionar visibles</button>
-                  <button id="clear" type="button" disabled="">Limpiar selecciÃ³n</button>
+                  <button id="clear" type="button" disabled="">Limpiar selección</button>
                 </div>
               </section>
 
               <section class="panel content alternate" id="profiles" hidden aria-labelledby="profilesTitle">
                 <h2 id="profilesTitle">Selecciones guardadas</h2>
-                <p>GuardÃ¡ combinaciones de juegos de la cuenta elegida.</p>
+                <p>Guardá combinaciones de juegos de la cuenta elegida.</p>
                 <form id="profileForm" class="toolbar">
-                  <input id="profileName" placeholder="Nombre de la selecciÃ³n" aria-label="Nombre de la selecciÃ³n" maxlength="60" required="" disabled="">
-                  <button class="primary" type="submit" disabled="">Guardar selecciÃ³n</button>
+                  <input id="profileName" placeholder="Nombre de la selección" aria-label="Nombre de la selección" maxlength="60" required="" disabled="">
+                  <button class="primary" type="submit" disabled="">Guardar selección</button>
                 </form>
-                <div id="profileList"><p class="muted">TodavÃ­a no hay selecciones guardadas para esta cuenta.</p></div>
+                <div id="profileList"><p class="muted">Todavía no hay selecciones guardadas para esta cuenta.</p></div>
               </section>
 
               <section class="panel content alternate" id="stats" hidden aria-labelledby="activityTitle">
@@ -141,19 +141,19 @@
                 <div id="activeSessions" class="active-sessions"></div>
                 <h2>Historial de actividad</h2>
                 <p id="sync">Sin sincronizar</p>
-                <ol id="logs" class="logs"><li class="muted">TodavÃ­a no hay actividad registrada.</li></ol>
+                <ol id="logs" class="logs"><li class="muted">Todavía no hay actividad registrada.</li></ol>
               </section>
 
               <section class="panel content alternate" id="settings" hidden aria-labelledby="settingsTitle">
                 <h2 id="settingsTitle">Ajustes y seguridad</h2>
-                <p>El tÃ­tulo, la descripciÃ³n y el borrador se guardan por cuenta de Steam.</p>
+                <p>El título, la descripción y el borrador se guardan por cuenta de Steam.</p>
                 <p class="notice">La presencia mostrada proviene de Steam. Las horas, la presencia y los mensajes se gestionan en Steam.</p>
                 <p class="steam-links">
                   <a href="/privacidad">Privacidad</a>
                   <a href="https://store.steampowered.com/subscriber_agreement/" target="_blank" rel="noopener noreferrer">Acuerdo de suscriptor de Steam</a>
                   <a href="https://steamcommunity.com/dev/apiterms" target="_blank" rel="noopener noreferrer">Condiciones de la API de Steam</a>
                 </p>
-                <p>Los datos de Steam se muestran tal como estÃ¡n disponibles. AuraBoost es independiente de Valve.</p>
+                <p>Los datos de Steam se muestran tal como están disponibles. AuraBoost es independiente de Valve.</p>
               </section>
             </div>
 
@@ -161,7 +161,8 @@
               <h2 id="accountTitle">Cuentas de Steam</h2>
               <div class="accounts">
                 <select id="accountSelect" aria-label="Cambiar cuenta de Steam" disabled="" data-options="[[&quot;&quot;,&quot;Sin cuentas&quot;]]"><option value="">Sin cuentas</option></select>
-                <button id="removeAccount" class="square-button" type="button" title="Desvincular cuenta" aria-label="Desvincular cuenta" disabled="">âˆ’</button>
+                <button id="linkSteam" class="square-button add-account" type="button" title="Agregar cuenta de Steam" aria-label="Agregar cuenta de Steam" disabled>+</button>
+                <button id="removeAccount" class="square-button" type="button" title="Desvincular cuenta" aria-label="Desvincular cuenta" disabled="">−</button>
               </div>
               <div class="account">
                 <img id="avatar" src="/icon.png" width="48" height="48" alt="">
@@ -173,41 +174,38 @@
                   <small id="accountState" title="">Presencia sin datos</small>
                 </div>
               </div>
-              <button id="linkSteam" class="steam-button" type="button" aria-label="Vincular cuenta con Steam" disabled="">
-                <img id="steamButtonImage" alt="">
-                <span id="steamButtonText">Vincular cuenta con Steam</span>
-              </button>
-              <p id="linkHint" class="muted steam-hint">VerificÃ¡ tu identidad en Steam. Si Steam ofrece QR o te solicita Steam Guard, completÃ¡ ese paso allÃ­.</p>
+              <p id="linkHint" class="muted steam-hint" hidden>Agregá una cuenta con el botón +.</p>
               <div id="accountFields">
                 <div id="sessionBlock" class="session" hidden>
-                  <form id="sessionForm" class="toolbar">
+                  <button id="openSession" type="button" class="primary full" hidden>Conectar sesión</button>
+                  <dialog id="loginSteamDialog" class="panel" aria-labelledby="steamLoginTitle"><h2 id="steamLoginTitle">Conectar con Steam</h2><p id="steamLoginInfo">Elegí cómo iniciar sesión.</p><div class="login-methods"><button id="manualMethod" type="button" aria-pressed="true">Usuario y contraseña</button><button id="qrMethod" type="button" aria-pressed="false">QR en Steam</button></div><div id="qrInfo" hidden><p>La vinculación oficial de Steam permite escanear el QR si está disponible. No reemplaza la autorización de la sesión del cliente.</p><button id="officialQR" class="primary full" type="button">Abrir Steam</button></div><form id="sessionForm" class="toolbar">
                     <input id="steamUser" placeholder="Usuario de Steam" autocomplete="username" maxlength="64" required="">
-                    <input id="steamPassword" type="password" placeholder="ContraseÃ±a" autocomplete="current-password" maxlength="128" required="">
-                    <button class="primary" type="submit">Conectar sesiÃ³n</button>
-                  </form>
+                    <input id="steamPassword" type="password" placeholder="Contraseña" autocomplete="current-password" maxlength="128" required="">
+                    <button class="primary" type="submit">Conectar sesión</button>
+                  </form><button id="cancelLogin" class="text-button full" type="button">Cancelar</button></dialog>
                   <dialog id="guardDialog" class="panel" aria-labelledby="guardTitle"><h2 id="guardTitle">Steam Guard</h2><p id="guardMessage">Ingresá el código de seguridad de Steam.</p><form id="guardForm" class="toolbar">
-                    <input id="steamGuard" placeholder="Código de Steam Guard" maxlength="10" autocomplete="one-time-code" required="">
+                    <input id="steamGuard" autocapitalize="characters" spellcheck="false" placeholder="Código de Steam Guard" maxlength="10" autocomplete="one-time-code" required="">
                     <button class="primary" type="submit">Verificar</button>
                     <button id="cancelGuard" type="button">Cancelar</button>
                   </form></dialog>
                   <p id="sessionState" class="muted"></p>
-                  <button id="unlinkSession" class="text-button" type="button" hidden>Desconectar sesiÃ³n</button>
+                  <button id="unlinkSession" class="disconnect-action" type="button" hidden>Desconectar sesión</button>
                 </div>
                 <hr>
                 <form id="accountForm">
                   <label for="persona">Estado de Steam</label>
                   <select id="persona"><option value="online">Conectado</option><option value="away">Ausente</option><option value="busy">Ocupado</option><option value="snooze">Inactivo</option><option value="offline">Desconectado (presencia)</option></select>
-                  <label for="title">TÃ­tulo personalizado</label>
+                  <label for="title">Título personalizado</label>
                   <div class="inputclear">
                     <input id="title" placeholder="Ej.: Mis juegos de estrategia" maxlength="64">
-                    <button type="button" data-clear-field="title" title="Borrar tÃ­tulo" aria-label="Borrar tÃ­tulo">
+                    <button type="button" data-clear-field="title" title="Borrar título" aria-label="Borrar título">
                       <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 5h12M8 5V3h4v2M6 5l1 12h6l1-12M9 8v6M11 8v6"></path></svg>
                     </button>
                   </div>
-                  <label for="description">DescripciÃ³n local</label>
+                  <label for="description">Descripción local</label>
                   <div class="inputclear">
                     <input id="description" placeholder="Ej.: Juegos para el fin de semana" maxlength="500">
-                    <button type="button" data-clear-field="description" title="Borrar descripciÃ³n" aria-label="Borrar descripciÃ³n">
+                    <button type="button" data-clear-field="description" title="Borrar descripción" aria-label="Borrar descripción">
                       <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 5h12M8 5V3h4v2M6 5l1 12h6l1-12M9 8v6M11 8v6"></path></svg>
                     </button>
                   </div>
@@ -218,7 +216,7 @@
                     </button>
                   </div>
                   <textarea id="reply" rows="3" maxlength="500"></textarea>
-                  <label class="switch"><input id="autoSend" type="checkbox"> EnvÃ­o automÃ¡tico</label>
+                  <label class="switch"><input id="autoSend" type="checkbox"> Envío automático</label>
                   <small class="muted">Guardado en AuraBoost.</small>
                   <button id="saveAccount" type="submit" class="primary full" disabled="">Aplicar cambios</button>
                 </form>
@@ -243,7 +241,7 @@
       </form>
     </dialog>
     <p id="toast" role="status"></p>
-    <noscript><p class="notice noscript">ActivÃ¡ JavaScript para usar AuraBoost Private Cloud.</p></noscript>
+    <noscript><p class="notice noscript">Activá JavaScript para usar AuraBoost Private Cloud.</p></noscript>
   
 
 </body></html>

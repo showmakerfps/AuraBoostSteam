@@ -68,7 +68,7 @@ function limit(windowMs, max, railway) {
       const clientIp = railway ? req.get('x-real-ip') : '';
       return ipKeyGenerator(isIP(clientIp || '') ? clientIp : req.ip);
     },
-    handler: (_req, res) => problem(res, 429, 'Demasiadas solicitudes. EsperÃ¡ unos minutos y volvÃ© a intentar.')
+    handler: (_req, res) => problem(res, 429, 'Demasiadas solicitudes. Esperá unos minutos y volvé a intentar.')
   });
 }
 
@@ -157,9 +157,9 @@ function createApp(config, options = {}) {
     const nonce = cookieToken(req, names.csrf);
     const header = req.get('x-csrf-token');
     if (req.get('origin') !== config.appOrigin || !nonce || !equal(header, csrfFor(nonce, sessionId(req)))) {
-      return problem(res, 403, 'La verificaciÃ³n de origen fallÃ³. RecargÃ¡ la pÃ¡gina.');
+      return problem(res, 403, 'La verificación de origen falló. Recargá la página.');
     }
-    if (!req.is('application/json')) return problem(res, 415, 'EnviÃ¡ los datos como JSON.');
+    if (!req.is('application/json')) return problem(res, 415, 'Enviá los datos como JSON.');
     next();
   }
 
@@ -174,7 +174,7 @@ function createApp(config, options = {}) {
       await tokens.syncWithKey(accountId, await snapshot(accountId));
       publish({ accountId });
     } catch {
-      // el prÃ³ximo refresco lo reintenta
+      // el próximo refresco lo reintenta
     }
   }
 
@@ -200,10 +200,10 @@ function createApp(config, options = {}) {
   const expectedHost = new URL(config.appOrigin).host;
   app.use((req, res, next) => {
     const host = (config.railway && req.get('x-forwarded-host')) || req.get('host');
-    if (host !== expectedHost) return problem(res, 400, 'Dominio invÃ¡lido.');
+    if (host !== expectedHost) return problem(res, 400, 'Dominio inválido.');
     if (config.production && !req.secure) {
       if (['GET', 'HEAD'].includes(req.method)) return res.redirect(308, config.appOrigin);
-      return problem(res, 403, 'La conexiÃ³n requiere HTTPS.');
+      return problem(res, 403, 'La conexión requiere HTTPS.');
     }
     next();
   });
@@ -232,9 +232,9 @@ function createApp(config, options = {}) {
 
   app.post('/api/auth/login', async (req, res) => {
     const email = typeof req.body?.email === 'string' ? req.body.email.trim() : '';
-    if (!emailValid(email) || !passwordValid(req.body?.password)) return problem(res, 400, 'IngresÃ¡ un correo y una contraseÃ±a vÃ¡lidos.');
+    if (!emailValid(email) || !passwordValid(req.body?.password)) return problem(res, 400, 'Ingresá un correo y una contraseña válidos.');
     if (!await replaceSession(req, res, await auth.provider.login(email, req.body.password))) {
-      return problem(res, 401, 'Credenciales invÃ¡lidas o cuenta sin acceso.');
+      return problem(res, 401, 'Credenciales inválidas o cuenta sin acceso.');
     }
     replyOk(res);
   });
@@ -247,7 +247,7 @@ function createApp(config, options = {}) {
 
   app.post('/api/auth/recovery', async (req, res) => {
     const email = typeof req.body?.email === 'string' ? req.body.email.trim() : '';
-    if (!emailValid(email)) return problem(res, 400, 'IngresÃ¡ un correo vÃ¡lido.');
+    if (!emailValid(email)) return problem(res, 400, 'Ingresá un correo válido.');
     const flow = newAuthFlow(req, res, 'recovery');
     const url = await auth.provider.recovery(email, flow, `${config.appOrigin}/api/auth/recovery/callback`);
     res.json({ ok: true, ...(config.mock && url ? { url } : {}) });
@@ -273,9 +273,9 @@ function createApp(config, options = {}) {
   app.post('/api/auth/password', async (req, res) => {
     const password = req.body?.password;
     const id = sessionId(req);
-    if (!(await auth.authenticate(id))?.recovery) return problem(res, 403, 'AbrÃ­ un enlace de recuperaciÃ³n vÃ¡lido.');
-    if (!passwordValid(password) || password.length < 8) return problem(res, 400, 'UsÃ¡ al menos 8 caracteres.');
-    if (!await auth.changePassword(id, password)) return problem(res, 400, 'No se cambiÃ³ la contraseÃ±a. RevisÃ¡ los requisitos de Supabase.');
+    if (!(await auth.authenticate(id))?.recovery) return problem(res, 403, 'Abrí un enlace de recuperación válido.');
+    if (!passwordValid(password) || password.length < 8) return problem(res, 400, 'Usá al menos 8 caracteres.');
+    if (!await auth.changePassword(id, password)) return problem(res, 400, 'No se cambió la contraseña. Revisá los requisitos de Supabase.');
     closeStreams(id);
     clearSession(res);
     replyOk(res);
@@ -321,7 +321,7 @@ function createApp(config, options = {}) {
 
   app.use('/api', async (req, res, next) => {
     const actor = await auth.authenticate(sessionId(req));
-    if (!actor || actor.recovery) return problem(res, 401, 'IniciÃ¡ sesiÃ³n para acceder a AuraBoost.');
+    if (!actor || actor.recovery) return problem(res, 401, 'Iniciá sesión para acceder a AuraBoost.');
     req.actor = actor;
     next();
   }, express.json({ limit: '2mb' }));
@@ -329,7 +329,7 @@ function createApp(config, options = {}) {
   app.get('/api/state', async (req, res) => {
     const [accounts, settings] = await Promise.all([store.listAccounts(req.actor), store.getSettings(req.actor)]);
     res.json({
-      accounts: accounts.map(account => ({ ...account, sessionConnected: clients.isConnected(account.id), activitySince: clients.activitySince?.(account.id) ?? null })),
+      accounts: accounts.map(account => ({ ...account, sessionConnected: clients.isConnected(account.id), activitySince: clients.activitySince?.(account.id) ?? null, activitySeconds: clients.activitySeconds?.(account.id) ?? 0, connectionStatus: clients.connectionStatus?.(account.id) ?? 'disconnected' })),
       settings, mock: config.mock, steamConfigured: Boolean(config.steamApiKey || config.mock)
     });
   });
@@ -338,10 +338,10 @@ function createApp(config, options = {}) {
     const { body, actor } = req;
     if (!plainObject(body) || Object.keys(body).length !== 1 || !own(body, 'selectedAccountId') ||
         (body.selectedAccountId !== null && !steamId(body.selectedAccountId))) {
-      return problem(res, 400, 'SeleccionÃ¡ una cuenta vÃ¡lida.');
+      return problem(res, 400, 'Seleccioná una cuenta válida.');
     }
     if (body.selectedAccountId && !await store.getAccount(actor, body.selectedAccountId)) {
-      return problem(res, 404, 'No se encontrÃ³ esa cuenta de Steam.');
+      return problem(res, 404, 'No se encontró esa cuenta de Steam.');
     }
     await store.updateUserSettings(actor, body);
     publish({});
@@ -349,29 +349,29 @@ function createApp(config, options = {}) {
   });
 
   app.param('id', (req, res, next, id) => {
-    if (!steamId(id)) return problem(res, 400, 'Identificador de Steam invÃ¡lido.');
+    if (!steamId(id)) return problem(res, 400, 'Identificador de Steam inválido.');
     next();
   });
 
   app.get('/api/accounts/:id', async (req, res) => {
     const data = await store.getAccount(req.actor, req.params.id);
-    if (!data) return problem(res, 404, 'No se encontrÃ³ esa cuenta de Steam.');
+    if (!data) return problem(res, 404, 'No se encontró esa cuenta de Steam.');
     const { config, games, ...account } = data;
     res.json({
-      account: { ...account, sessionConnected: clients.isConnected(req.params.id), activitySince: clients.activitySince?.(req.params.id) ?? null },
+      account: { ...account, sessionConnected: clients.isConnected(req.params.id), activitySince: clients.activitySince?.(req.params.id) ?? null, activitySeconds: clients.activitySeconds?.(req.params.id) ?? 0, connectionStatus: clients.connectionStatus?.(req.params.id) ?? 'disconnected' },
       config, games, history: await store.listHistory(req.actor, req.params.id)
     });
   });
 
   app.patch('/api/accounts/:id/settings', async (req, res) => {
     const patch = settingsPatch(req.body);
-    if (!patch) return problem(res, 400, 'Los ajustes contienen valores invÃ¡lidos.');
+    if (!patch) return problem(res, 400, 'Los ajustes contienen valores inválidos.');
     const accountId = req.params.id;
     const updated = await store.updateSettings(req.actor, accountId, patch);
     if (!updated) return problem(res, 404, 'No se encontró esa cuenta de Steam.');
     clients.configure?.(accountId, updated.config ?? patch);
     if (patch.autoSend === true) {
-      await store.addHistory(req.actor, { id: accountId, text: 'EnvÃ­o automÃ¡tico activado.' }).catch(() => {});
+      await store.addHistory(req.actor, { id: accountId, text: 'Envío automático activado.' }).catch(() => {});
     }
     publish({ accountId });
     replyOk(res);
@@ -379,7 +379,7 @@ function createApp(config, options = {}) {
 
   app.delete('/api/accounts/:id', async (req, res) => {
     const accountId = req.params.id;
-    if (!await store.removeAccount(req.actor, accountId)) return problem(res, 404, 'No se encontrÃ³ esa cuenta de Steam.');
+    if (!await store.removeAccount(req.actor, accountId)) return problem(res, 404, 'No se encontró esa cuenta de Steam.');
     clients.disconnect(accountId);
     await clients.flushTokens?.(accountId);
     await tokens.delete(accountId);
@@ -388,7 +388,7 @@ function createApp(config, options = {}) {
   });
 
   app.post('/api/steam/link', syncLimit, async (req, res) => {
-    if ((await store.listAccounts(req.actor)).length >= 50) return problem(res, 409, 'Alcanzaste el mÃ¡ximo de cuentas vinculadas.');
+    if ((await store.listAccounts(req.actor)).length >= 50) return problem(res, 409, 'Alcanzaste el máximo de cuentas vinculadas.');
     const flow = flows.start('steam', sessionId(req));
     res.json({ url: steam.beginLink(flow.id) });
   });
@@ -408,18 +408,18 @@ function createApp(config, options = {}) {
       const cleanup = () => syncing.delete(accountId);
       operation.then(cleanup, cleanup);
     }
-    if (!await syncing.get(accountId)) return problem(res, 404, 'No se encontrÃ³ esa cuenta de Steam.');
+    if (!await syncing.get(accountId)) return problem(res, 404, 'No se encontró esa cuenta de Steam.');
     replyOk(res);
   });
 
   app.post('/api/accounts/:id/session', syncLimit, async (req, res) => {
-    if (config.mock) return problem(res, 409, 'En modo demostraciÃ³n no se conectan sesiones reales.');
+    if (config.mock) return problem(res, 409, 'En modo demostración no se conectan sesiones reales.');
     const accountId = req.params.id;
-    if (!await store.getAccount(req.actor, accountId)) return problem(res, 404, 'No se encontrÃ³ esa cuenta de Steam.');
+    if (!await store.getAccount(req.actor, accountId)) return problem(res, 404, 'No se encontró esa cuenta de Steam.');
     const accountName = typeof req.body?.accountName === 'string' ? req.body.accountName.trim() : '';
     const password = req.body?.password;
-    if (!/^[\w.-]{3,64}$/.test(accountName)) return problem(res, 400, 'IngresÃ¡ un usuario de Steam vÃ¡lido.');
-    if (typeof password !== 'string' || !password || password.length > 128) return problem(res, 400, 'IngresÃ¡ la contraseÃ±a de Steam.');
+    if (!/^[\w.-]{3,64}$/.test(accountName)) return problem(res, 400, 'Ingresá un usuario de Steam válido.');
+    if (typeof password !== 'string' || !password || password.length > 128) return problem(res, 400, 'Ingresá la contraseña de Steam.');
     let result;
     try {
       result = await clients.login(accountId, req.actor.id, accountName, password);
@@ -431,6 +431,7 @@ function createApp(config, options = {}) {
       return problem(res, 400, 'Esa cuenta de Steam no coincide con la vinculada.');
     }
     if (result.status === 'connected') {
+      await clients.flushTokens?.(accountId);
       await store.setSessionLinked(req.actor, accountId, true);
       clients.configure?.(accountId, (await store.getAccount(req.actor, accountId))?.config);
     }
@@ -443,7 +444,7 @@ function createApp(config, options = {}) {
     if (!await store.getAccount(req.actor, accountId)) return problem(res, 404, 'No se encontró esa cuenta de Steam.');
     const loginId = typeof req.body?.loginId === 'string' ? req.body.loginId : '';
     const code = typeof req.body?.code === 'string' ? req.body.code.trim() : '';
-    if (!/^[A-Za-z0-9]{5,10}$/.test(code)) return problem(res, 400, 'IngresÃ¡ el cÃ³digo de Steam Guard.');
+    if (!/^[A-Za-z0-9]{5,10}$/.test(code)) return problem(res, 400, 'Ingresá el código de Steam Guard.');
     try {
       const result = await clients.guard(accountId, loginId, code);
       if (result.status === 'connected' && clients.steamIdOf(accountId) !== accountId) {
@@ -451,6 +452,7 @@ function createApp(config, options = {}) {
         return problem(res, 400, 'La cuenta de Steam no coincide con la vinculada.');
       }
       if (result.status === 'connected') {
+        await clients.flushTokens?.(accountId);
         await store.setSessionLinked(req.actor, accountId, true);
         clients.configure?.(accountId, (await store.getAccount(req.actor, accountId))?.config);
       }
@@ -476,18 +478,18 @@ function createApp(config, options = {}) {
   app.post('/api/accounts/:id/launch', syncLimit, async (req, res) => {
     const accountId = req.params.id;
     const appid = Number(req.body?.appid);
-    if (!Number.isInteger(appid) || appid < 1 || appid > 0xffffffff) return problem(res, 400, 'AppID invÃ¡lido.');
+    if (!Number.isInteger(appid) || appid < 1 || appid > 0xffffffff) return problem(res, 400, 'AppID inválido.');
     const account = await store.getAccount(req.actor, accountId);
-    if (!account) return problem(res, 404, 'No se encontrÃ³ esa cuenta de Steam.');
+    if (!account) return problem(res, 404, 'No se encontró esa cuenta de Steam.');
     const game = account.games.find(item => item.id === appid);
-    if (!game) return problem(res, 400, 'Ese juego no estÃ¡ en la biblioteca de la cuenta.');
+    if (!game) return problem(res, 400, 'Ese juego no está en la biblioteca de la cuenta.');
     try {
       clients.launch(accountId, appid);
     } catch (error) {
       return problem(res, error.status ?? 409, error.message);
     }
     await store.setPlaying(req.actor, accountId, appid);
-    await store.addHistory(req.actor, { id: accountId, text: `IniciÃ³ ${game.name}.` }).catch(() => {});
+    await store.addHistory(req.actor, { id: accountId, text: `Inició ${game.name}.` }).catch(() => {});
     publish({ accountId });
     replyOk(res);
   });
@@ -495,12 +497,12 @@ function createApp(config, options = {}) {
   app.post('/api/accounts/:id/stop', syncLimit, async (req, res) => {
     const accountId = req.params.id;
     const account = await store.getAccount(req.actor, accountId);
-    if (!account) return problem(res, 404, 'No se encontrÃ³ esa cuenta de Steam.');
-    clients.stop(accountId);
+    if (!account) return problem(res, 404, 'No se encontró esa cuenta de Steam.');
+    const activitySeconds = clients.stop(accountId) ?? 0;
     await store.setPlaying(req.actor, accountId, null);
-    await store.addHistory(req.actor, { id: accountId, text: 'Detuvo el juego.' }).catch(() => {});
+    await store.addHistory(req.actor, { id: accountId, text: 'Detuvo el juego. Tiempo de actividad registrado: ' + Math.floor(activitySeconds / 60) + ' min ' + activitySeconds % 60 + ' s.' }).catch(() => {});
     publish({ accountId });
-    replyOk(res);
+    res.json({ ok: true, activitySeconds });
     setTimeout(() => { void syncQuiet(accountId); }, 3000);
   });
 
@@ -508,7 +510,7 @@ function createApp(config, options = {}) {
     if (req.method !== 'GET') return res.sendStatus(405);
     const origin = req.get('origin');
     if ((origin && origin !== config.appOrigin) || req.get('sec-fetch-site') === 'cross-site') {
-      return problem(res, 403, 'Origen invÃ¡lido.');
+      return problem(res, 403, 'Origen inválido.');
     }
     const id = sessionId(req);
     const clientsById = streams.get(id) || new Set();
@@ -545,16 +547,16 @@ function createApp(config, options = {}) {
     });
   });
 
-  app.use((_req, res) => problem(res, 404, 'No se encontrÃ³ la ruta.'));
+  app.use((_req, res) => problem(res, 404, 'No se encontró la ruta.'));
   app.use((error, _req, res, next) => {
     if (res.headersSent) return next(error);
-    if (error.type === 'entity.parse.failed') return problem(res, 400, 'El JSON enviado es invÃ¡lido.');
+    if (error.type === 'entity.parse.failed') return problem(res, 400, 'El JSON enviado es inválido.');
     if (error.status === 413) return problem(res, 413, 'La solicitud es demasiado grande.');
     if ([400, 401, 403, 404, 409, 503].includes(error.status)) {
-      return problem(res, error.status, error.status === 400 ? 'La solicitud es invÃ¡lida.' : error.message);
+      return problem(res, error.status, error.status === 400 ? 'La solicitud es inválida.' : error.message);
     }
     console.error('AuraBoost no pudo completar una solicitud.');
-    return problem(res, 503, 'El servicio no pudo completar la solicitud. VolvÃ© a intentar.');
+    return problem(res, 503, 'El servicio no pudo completar la solicitud. Volvé a intentar.');
   });
 
   return {

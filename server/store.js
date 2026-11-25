@@ -64,7 +64,7 @@ function createRequest({ supabaseUrl, supabaseKey, fetchImpl }) {
         throw new StoreError(409, 'Ese registro ya existe.');
       }
       if (response.status === 409 && problem?.code === '23503') {
-        throw new StoreError(404, 'No se encontrÃ³ la cuenta de Steam.');
+        throw new StoreError(404, 'No se encontró la cuenta de Steam.');
       }
       throw new StoreError(503, 'No se pudo acceder al almacenamiento.');
     }
@@ -72,7 +72,7 @@ function createRequest({ supabaseUrl, supabaseKey, fetchImpl }) {
     try {
       return await response.json();
     } catch {
-      throw new StoreError(503, 'El almacenamiento devolviÃ³ una respuesta invÃ¡lida.');
+      throw new StoreError(503, 'El almacenamiento devolvió una respuesta inválida.');
     }
   };
 }
@@ -82,7 +82,7 @@ function assertOwner(actor, allowedUserId, mock) {
     throw new StoreError(403, 'Esta cuenta no tiene acceso a AuraBoost.');
   }
   if (!mock && (typeof actor.accessToken !== 'string' || !actor.accessToken)) {
-    throw new StoreError(401, 'Tu sesiÃ³n venciÃ³. VolvÃ© a iniciar sesiÃ³n.');
+    throw new StoreError(401, 'Tu sesión venció. Volvé a iniciar sesión.');
   }
 }
 
@@ -103,7 +103,7 @@ function snapshotRow({ name, avatar, presence, online, syncedAt, libraryStatus, 
 function syncHistoryText(row) {
   const messages = {
     available: `Biblioteca sincronizada. ${row.games.length} juegos recibidos.`,
-    unavailable: 'Steam no devolviÃ³ una biblioteca visible.',
+    unavailable: 'Steam no devolvió una biblioteca visible.',
     unconfigured: 'La consulta a Steam requiere una clave Web API.'
   };
   return messages[row.library_status];
@@ -224,7 +224,7 @@ function createMockStore(dataDir) {
       return JSON.parse(await fs.readFile(statePath, 'utf8'));
     } catch (error) {
       if (error.code === 'ENOENT') return memory;
-      throw new StoreError(503, 'No se pudo leer el almacenamiento de demostraciÃ³n.');
+      throw new StoreError(503, 'No se pudo leer el almacenamiento de demostración.');
     }
   }
 
@@ -237,7 +237,7 @@ function createMockStore(dataDir) {
         await fs.rename(temporary, statePath);
       } catch {
         await fs.unlink(temporary).catch(() => {});
-        throw new StoreError(503, 'No se pudo guardar el almacenamiento de demostraciÃ³n.');
+        throw new StoreError(503, 'No se pudo guardar el almacenamiento de demostración.');
       }
     }
     memory = state;
@@ -272,7 +272,7 @@ function createMockStore(dataDir) {
     },
     addAccount(actor, account) {
       return run(state => {
-        if (find(state, account.id)) throw new StoreError(409, 'Esa cuenta de Steam ya estÃ¡ vinculada.');
+        if (find(state, account.id)) throw new StoreError(409, 'Esa cuenta de Steam ya está vinculada.');
         const row = { ...accountRow(actor, account), created_at: new Date().toISOString() };
         state.accounts.push(row);
         recordHistory(state, account.id, 'Cuenta de Steam vinculada.');
@@ -333,7 +333,7 @@ function createMockStore(dataDir) {
     updateUserSettings(actor, { selectedAccountId }) {
       return run(state => {
         if (selectedAccountId !== null && !find(state, selectedAccountId)) {
-          throw new StoreError(404, 'No se encontrÃ³ la cuenta de Steam.');
+          throw new StoreError(404, 'No se encontró la cuenta de Steam.');
         }
         state.settings.selectedAccountId = selectedAccountId;
         return state.settings;
@@ -344,7 +344,7 @@ function createMockStore(dataDir) {
     },
     addHistory(actor, { id, text }) {
       return run(state => {
-        if (!find(state, id)) throw new StoreError(404, 'No se encontrÃ³ la cuenta de Steam.');
+        if (!find(state, id)) throw new StoreError(404, 'No se encontró la cuenta de Steam.');
         return recordHistory(state, id, text);
       }, change);
     }
@@ -377,7 +377,7 @@ function createSessionStore({ supabaseUrl, supabaseSecretKey, fetchImpl = global
       },
       async create(id, value, expiresAt) {
         prune();
-        if (sessions.has(id)) throw new StoreError(409, 'La sesiÃ³n ya existe.');
+        if (sessions.has(id)) throw new StoreError(409, 'La sesión ya existe.');
         sessions.set(id, { value, expiresAt });
       },
       async save(id, value, expiresAt) {

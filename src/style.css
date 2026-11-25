@@ -378,3 +378,17 @@ dialog h2 { font-size: 21px; margin-bottom: 10px; }
 .session-timer { margin-left: auto; font-variant-numeric: tabular-nums; color: #c493ff; }
 #guardDialog form { display: grid; margin-top: 14px; gap: 10px; }
 #guardDialog input { font-size: 16px; letter-spacing: 1px; }
+
+.accounts { grid-template-columns: minmax(0,1fr) 38px 38px; }
+.add-account { color: #d8b9ff; border-color: #624187; }
+.disconnect-action { width: 100%; background: #251b30; color: #e3caff; border-color: #59406c; }
+.quick-activity { flex: none; max-height: 180px; overflow-y: auto; margin: 0 0 8px; padding: 10px; border: 1px solid #49345d; border-radius: 10px; background: #1e172a; }
+.quick-activity h2 { font-size: 13px; margin: 0 0 8px; }
+.quick-activity .active-sessions { margin: 0; }
+.active-session-info { flex: 1 1 130px; min-width: 0; overflow-wrap: anywhere; }
+.active-status { color: #b8a6c8; }
+.stop-session { background: #332039; border-color: #76445c; color: #ffbfcb; font-size: 12px; min-height: 32px; }
+.login-methods { display: flex; gap: 8px; margin: 16px 0; }
+.login-methods button { flex: 1; font-size: 12px; }
+#loginSteamDialog form { display: grid; gap: 10px; }
+#steamGuard { text-transform: uppercase; }

@@ -10,14 +10,14 @@ const emptyConfig = { selected: [], favorites: [], profiles: [], title: '', desc
 const logo = '/icon.png';
 const steamSignIn = 'https://community.fastly.steamstatic.com/public/images/signinthroughsteam/sits_01.png';
 const accountStatuses = {
-  unconfigured: 'ConfigurÃ¡ la clave de la API de Steam para obtener el perfil y la biblioteca.',
-  unavailable: 'Steam no entregÃ³ la biblioteca. RevisÃ¡ la privacidad de tus detalles de juegos y volvÃ© a sincronizar.'
+  unconfigured: 'Configurá la clave de la API de Steam para obtener el perfil y la biblioteca.',
+  unavailable: 'Steam no entregó la biblioteca. Revisá la privacidad de tus detalles de juegos y volvé a sincronizar.'
 };
 const pageCopy = {
-  library: ['Biblioteca', 'OrganizÃ¡ los juegos de tus cuentas de Steam.'],
-  profiles: ['Perfiles', 'AlternÃ¡ entre tus selecciones guardadas.'],
-  stats: ['Actividad', 'ConsultÃ¡ las Ãºltimas acciones de la cuenta elegida.'],
-  settings: ['Ajustes', 'AdministrÃ¡ las cuentas vinculadas y sus textos locales.']
+  library: ['Biblioteca', 'Organizá los juegos de tus cuentas de Steam.'],
+  profiles: ['Perfiles', 'Alterná entre tus selecciones guardadas.'],
+  stats: ['Actividad', 'Consultá las últimas acciones de la cuenta elegida.'],
+  settings: ['Ajustes', 'Administrá las cuentas vinculadas y sus textos locales.']
 };
 
 let session = {};
@@ -34,6 +34,8 @@ let refreshVersion = 0;
 let selectionWrites = Promise.resolve();
 let avatarKey;
 let guardLogin;
+let loginAccountId;
+let loginMode = 'manual';
 const details = new Map();
 const detailVersions = new Map();
 const failedDetails = new Set();
@@ -70,7 +72,7 @@ function setConnection(message, connected = false) {
 }
 
 function labelText(error) {
-  return error.status ? error.message : 'No se pudo comunicar con AuraBoost. VolvÃ© a intentar.';
+  return error.status ? error.message : 'No se pudo comunicar con AuraBoost. Volvé a intentar.';
 }
 
 async function request(path, { method = 'GET', body, expire = true } = {}) {
@@ -84,10 +86,10 @@ async function request(path, { method = 'GET', body, expire = true } = {}) {
   const response = await fetch(path, options);
   const data = await response.json().catch(() => null);
   if (!response.ok || data === null) {
-    if (response.status === 401 && expire && session.authenticated) void bootstrap('La sesiÃ³n venciÃ³. VolvÃ© a ingresar.');
+    if (response.status === 401 && expire && session.authenticated) void bootstrap('La sesión venció. Volvé a ingresar.');
     const message = typeof data?.error === 'string' && data.error.length <= 240
       ? data.error
-      : 'No se pudo completar la operaciÃ³n.';
+      : 'No se pudo completar la operación.';
     throw Object.assign(new Error(message), { status: response.status });
   }
   return data;
@@ -95,9 +97,9 @@ async function request(path, { method = 'GET', body, expire = true } = {}) {
 
 function showGate(mode, message = '', isError = false) {
   const [heading, intro] = {
-    login: ['Iniciar sesiÃ³n', 'AccedÃ© con tu cuenta autorizada de AuraBoost.'],
-    recovery: ['Recuperar contraseÃ±a', 'IngresÃ¡ el correo de tu cuenta de AuraBoost.'],
-    password: ['Elegir una contraseÃ±a nueva', 'EscribÃ­ al menos 8 caracteres.']
+    login: ['Iniciar sesión', 'Accedé con tu cuenta autorizada de AuraBoost.'],
+    recovery: ['Recuperar contraseña', 'Ingresá el correo de tu cuenta de AuraBoost.'],
+    password: ['Elegir una contraseña nueva', 'Escribí al menos 8 caracteres.']
   }[mode];
   $('loading').hidden = true;
   $('gate').hidden = false;
@@ -147,6 +149,8 @@ function clearPrivateState() {
   dashboard = {};
   selectedId = undefined;
   guardLogin = undefined;
+  loginAccountId = undefined;
+  if ($('loginSteamDialog').open) $('loginSteamDialog').close();
   refreshVersion += 1;
   selectionWrites = Promise.resolve();
   details.clear();
@@ -184,7 +188,7 @@ async function bootstrap(notice = '', returned = {}) {
       setConnection(session.mock ? 'Datos simulados' : 'Conectando con AuraBoost');
       showApp();
       if (notice) setToast(notice);
-      if (returned.auth === 'error') setToast('No se pudo completar el inicio de sesiÃ³n.');
+      if (returned.auth === 'error') setToast('No se pudo completar el inicio de sesión.');
       if (returned.steam === 'vinculada') setToast('Cuenta de Steam vinculada.');
       if (returned.steam === 'error') setToast('No se pudo vincular la cuenta de Steam.');
       await refresh();
@@ -193,7 +197,7 @@ async function bootstrap(notice = '', returned = {}) {
     }
     clearPrivateState();
     const authError = returned.auth === 'error' || (returned.auth === 'recuperar' && !session.recovery);
-    showGate(session.recovery ? 'password' : 'login', authError ? 'No se pudo usar el enlace. IniciÃ¡ sesiÃ³n o solicitÃ¡ uno nuevo.' : notice, authError);
+    showGate(session.recovery ? 'password' : 'login', authError ? 'No se pudo usar el enlace. Iniciá sesión o solicitá uno nuevo.' : notice, authError);
   } catch (error) {
     if (version !== authVersion) return;
     if (wasAuthenticated && error.status !== 401) {
@@ -217,7 +221,7 @@ function startEvents() {
     if (stream !== source) return;
     window.clearTimeout(connectionTimer);
     connectionTimer = undefined;
-    setConnection(session.mock ? 'Datos simulados en vivo' : 'ConexiÃ³n en vivo', true);
+    setConnection(session.mock ? 'Datos simulados en vivo' : 'Conexión en vivo', true);
     scheduleRefresh();
   });
   source.addEventListener('state', scheduleRefresh);
@@ -230,10 +234,10 @@ function startEvents() {
       try {
         const current = await request('/api/session', { expire: false });
         if (version !== authVersion || stream !== source) return;
-        if (!current.authenticated || current.recovery) await bootstrap('VolvÃ© a iniciar sesiÃ³n para continuar.');
+        if (!current.authenticated || current.recovery) await bootstrap('Volvé a iniciar sesión para continuar.');
         else if (source.readyState === EventSource.CLOSED) startEvents();
       } catch {
-        // EventSource reintenta al restablecerse la conexiÃ³n.
+        // EventSource reintenta al restablecerse la conexión.
       }
     }, 2000);
   });
@@ -382,14 +386,17 @@ function renderAccount() {
   $('accountDot').classList.toggle('on', account?.online === true);
   $('accountState').textContent = account?.presence ?? 'Presencia sin datos';
   const observed = asDate(account?.syncedAt);
-  $('accountState').title = observed ? 'Ãšltima consulta Â· ' + date.format(observed) : '';
+  $('accountState').title = observed ? 'Última consulta · ' + date.format(observed) : '';
   renderAvatar(account?.avatar);
   $('accountFields').hidden = !currentData();
 
   const connected = account?.sessionConnected === true;
   const waiting = guardLogin?.accountId === selectedId;
   $('sessionBlock').hidden = !currentData();
-  $('sessionForm').hidden = connected || waiting;
+  const reconnecting = account?.connectionStatus === 'reconnecting' || account?.connectionStatus === 'connecting';
+  $('openSession').hidden = !account || connected || waiting || reconnecting;
+  $('sessionForm').hidden = loginMode !== 'manual';
+  if ((connected || waiting) && $('loginSteamDialog').open) $('loginSteamDialog').close();
   const guardDialog = $('guardDialog');
   if (waiting && !guardDialog.open && session.authenticated) guardDialog.showModal();
   else if (!waiting && guardDialog.open) guardDialog.close();
@@ -397,10 +404,8 @@ function renderAccount() {
   for (const form of [$('sessionForm'), $('guardForm')]) {
     for (const input of form.querySelectorAll('input, button')) input.disabled = working;
   }
-  $('unlinkSession').hidden = !connected && !account?.sessionLinked;
-  $('sessionState').textContent = connected
-    ? 'SesiÃ³n de Steam conectada.'
-    : waiting ? 'Steam pidiÃ³ un cÃ³digo de Steam Guard.' : 'ConectÃ¡ la sesiÃ³n para iniciar juegos y contar horas.';
+  $('unlinkSession').hidden = !connected && !account?.sessionLinked && !reconnecting;
+  $('sessionState').textContent = connected ? 'Sesión de Steam conectada.' : waiting ? 'Esperando Steam Guard.' : reconnecting ? 'Recuperando sesión automáticamente…' : account?.sessionLinked ? 'Steam requiere una nueva autorización.' : 'Sesión no conectada.';
   $('autoSend').checked = (drafts.get(selectedId)?.autoSend ?? config.autoSend) === true;
 
   const draft = drafts.get(selectedId);
@@ -412,17 +417,9 @@ function renderAccount() {
   $('libraryStatus').textContent = accountStatuses[account?.libraryStatus] ?? '';
   $('libraryStatus').hidden = !$('libraryStatus').textContent;
 
-  const signedIn = Boolean(session.authenticated);
-  const visibleSteamImage = signedIn && !session.mock && !imageFailed;
-  $('steamButtonImage').hidden = !visibleSteamImage;
-  if (visibleSteamImage && !$('steamButtonImage').getAttribute('src')) $('steamButtonImage').src = steamSignIn;
-  $('steamButtonText').hidden = visibleSteamImage;
-  $('steamButtonText').textContent = session.mock ? 'Vincular cuenta simulada' : 'Vincular cuenta con Steam';
-  $('linkSteam').setAttribute('aria-label', $('steamButtonText').textContent);
-  $('linkSteam').disabled = !signedIn || busy.has('link');
-  $('linkHint').textContent = session.mock
-    ? 'VinculaciÃ³n de ejemplo.'
-    : 'VerificÃ¡ tu identidad en Steam. Si Steam ofrece QR o te solicita Steam Guard, completÃ¡ ese paso allÃ­.';
+  $('linkSteam').disabled = !session.authenticated || busy.has('link');
+  $('linkHint').hidden = accounts.length > 0;
+
 }
 
 function avatarUrl(value) {
@@ -432,7 +429,7 @@ function avatarUrl(value) {
     const knownHost = url.hostname.endsWith('.steamstatic.com') || url.hostname === 'steamcdn-a.akamaihd.net';
     if (url.protocol === 'https:' && !url.port && !url.username && !url.password && knownHost) return url;
   } catch {
-    // Los datos ausentes o invÃ¡lidos usan la imagen local.
+    // Los datos ausentes o inválidos usan la imagen local.
   }
 }
 
@@ -486,22 +483,22 @@ function visibleGames() {
 
 function showEmptyLibrary() {
   let title = 'No hay juegos para mostrar';
-  let message = 'ProbÃ¡ con otro filtro o tÃ©rmino de bÃºsqueda.';
+  let message = 'Probá con otro filtro o término de búsqueda.';
   if (!selectedId) {
     title = 'Tu biblioteca, en un solo lugar';
-    message = 'VinculÃ¡ una cuenta de Steam para ver sus juegos.';
+    message = 'Vinculá una cuenta de Steam para ver sus juegos.';
   } else if (failedDetails.has(selectedId) && !currentData()) {
     title = 'No se pudo abrir la biblioteca';
-    message = 'VolvÃ© a cargar los datos de la cuenta.';
+    message = 'Volvé a cargar los datos de la cuenta.';
   } else if (!currentData()) {
     title = 'Cargando biblioteca';
     message = 'Consultando los datos guardados de esta cuenta.';
   } else if (!currentData().games.length) {
     title = 'No hay juegos disponibles';
-    message = accountStatuses[currentAccount()?.libraryStatus] ?? 'SincronizÃ¡ la cuenta para consultar los datos de Steam.';
+    message = accountStatuses[currentAccount()?.libraryStatus] ?? 'Sincronizá la cuenta para consultar los datos de Steam.';
   }
   const box = element('div', 'empty');
-  const symbol = element('div', 'symbol', 'â—‡');
+  const symbol = element('div', 'symbol', '◇');
   symbol.setAttribute('aria-hidden', 'true');
   box.append(symbol, element('strong', '', title), element('p', '', message));
   if (!selectedId && session.authenticated) {
@@ -528,7 +525,7 @@ function playButton(account, game) {
   const button = element('button', 'play' + (playing ? ' on' : ''), playing ? 'Detener' : 'Iniciar');
   button.type = 'button';
   button.disabled = !ready || busy.has('play:' + game.id);
-  button.title = ready ? '' : 'ConectÃ¡ la sesiÃ³n de Steam de esta cuenta';
+  button.title = ready ? '' : 'Conectá la sesión de Steam de esta cuenta';
   button.setAttribute('aria-label', (playing ? 'Detener ' : 'Iniciar ') + game.name);
   button.addEventListener('click', () => {
     const id = selectedId;
@@ -557,16 +554,16 @@ function gameRow(game, selected, favorites) {
   const metadata = ['AppID ' + game.id];
   if (Number.isFinite(game.bytes)) metadata.push(number.format(game.bytes / 1e9) + ' GB');
   if (Number.isFinite(game.release)) metadata.push(year.format(new Date(game.release * 1000)));
-  name.append(element('small', '', metadata.join(' Â· ')));
+  name.append(element('small', '', metadata.join(' · ')));
 
   const favorite = favorites.has(game.id);
-  const star = element('button', 'star', favorite ? 'â˜…' : 'â˜†');
+  const star = element('button', 'star', favorite ? '★' : '☆');
   star.type = 'button';
   star.dataset.gameId = game.id;
-  star.setAttribute('aria-label', 'Favorito Â· ' + game.name);
+  star.setAttribute('aria-label', 'Favorito · ' + game.name);
   star.setAttribute('aria-pressed', String(favorite));
   star.addEventListener('click', () => toggleGame('favorites', game.id));
-  const hours = Number.isFinite(game.minutes) ? number.format(game.minutes / 60) + ' h' : 'â€”';
+  const hours = Number.isFinite(game.minutes) ? number.format(game.minutes / 60) + ' h' : '—';
   row.append(check, coverElement(game), name, element('span', 'playtime', hours), playButton(currentAccount(), game), star);
   return row;
 }
@@ -576,16 +573,6 @@ function renderGames() {
   const config = configFor(selectedId);
   const selected = new Set(config.selected);
   const favorites = new Set(config.favorites);
-  const tray = $('selectedTray');
-  tray.hidden = selected.size === 0;
-  tray.replaceChildren(...[...selected].map(id => {
-    const game = games.find(item => item.id === id);
-    const chip = element('button', 'selected-chip', (game?.name ?? ('AppID ' + id)) + ' ×');
-    chip.type = 'button';
-    chip.title = 'Quitar de la selección';
-    chip.addEventListener('click', () => toggleGame('selected', id));
-    return chip;
-  }));
   const counts = { all: games.length, selected: selected.size, favorites: favorites.size };
   for (const button of buttons('[data-filter]')) {
     const key = button.dataset.filter;
@@ -614,7 +601,7 @@ function renderGames() {
 
   const sum = games.reduce((total, game) => total + (Number.isFinite(game.minutes) ? game.minutes : 0), 0);
   $('count').textContent = number.format(games.length);
-  $('hours').textContent = games.some(game => Number.isFinite(game.minutes)) ? number.format(sum / 60) + ' h' : 'â€”';
+  $('hours').textContent = games.some(game => Number.isFinite(game.minutes)) ? number.format(sum / 60) + ' h' : '—';
   $('selectedMetric').textContent = number.format(selected.size);
   $('favoriteMetric').textContent = number.format(favorites.size);
   $('selectedCount').textContent = number.format(selected.size) + (selected.size === 1 ? ' seleccionado' : ' seleccionados');
@@ -638,7 +625,7 @@ function renderProfiles() {
   $('profileName').disabled = !selectedId;
   $('profileForm').querySelector('button').disabled = !selected.length;
   if (!profiles.length) {
-    target.replaceChildren(element('p', 'muted', 'TodavÃ­a no hay selecciones guardadas para esta cuenta.'));
+    target.replaceChildren(element('p', 'muted', 'Todavía no hay selecciones guardadas para esta cuenta.'));
     return;
   }
   target.replaceChildren(...profiles.map(({ name, ids }, index) => {
@@ -656,7 +643,7 @@ function renderProfiles() {
     remove.addEventListener('click', () => {
       void changeConfig({ profiles: configFor(selectedId).profiles.filter((_, position) => position !== index) });
     });
-    row.append(element('span', '', name + ' Â· ' + number.format(ids.length) + ' juegos'), load, remove);
+    row.append(element('span', '', name + ' · ' + number.format(ids.length) + ' juegos'), load, remove);
     return row;
   }));
 }
@@ -667,22 +654,43 @@ function asDate(value) {
   return Number.isNaN(parsed.getTime()) ? undefined : parsed;
 }
 
-function renderHistory() {
+function durationText(seconds) {
+  const n = Math.max(0, Math.floor(seconds || 0));
+  return [Math.floor(n/3600), Math.floor(n/60)%60, n%60].map(x => String(x).padStart(2,'0')).join(':');
+}
+function renderActiveSessions() {
   const active = (dashboard.accounts ?? []).filter(account => account.playing);
-  $('activeSessions').replaceChildren(...active.map(account => {
-    const row = element('div', 'active-session');
-    const game = details.get(account.id)?.games?.find(game => game.id === account.playing.appid);
-    row.append(element('strong', '', account.name), element('span', '', game?.name ?? ('AppID ' + account.playing.appid)));
-    const timer = element('span', 'session-timer', account.sessionConnected ? 'Calculando…' : 'Sin conexión');
-    if (account.sessionConnected && account.activitySince) timer.dataset.since = account.activitySince;
-    else if (account.sessionConnected) timer.textContent = 'Tiempo no disponible';
-    row.append(timer);
-    return row;
-  }));
-  if (!active.length) $('activeSessions').append(element('p', 'muted', 'No hay sesiones de juego registradas.'));
+  $('quickActivity').hidden = !active.length;
+  for (const target of [$('quickSessions'), $('activeSessions')]) {
+    target.replaceChildren(...active.map(account => {
+      const row = element('div', 'active-session');
+      const game = details.get(account.id)?.games?.find(game => game.id === account.playing.appid);
+      const info = element('div', 'active-session-info');
+      info.append(element('strong', '', game?.name ?? account.playing.name ?? ('AppID ' + account.playing.appid)), element('small', '', account.name));
+      const timer = element('span', 'session-timer', durationText(account.activitySeconds));
+      timer.dataset.elapsed = String(account.activitySeconds ?? 0);
+      if (account.sessionConnected && account.activitySince) timer.dataset.since = account.activitySince;
+      timer.title = 'Tiempo de actividad conectado registrado por AuraBoost; no es tiempo confirmado por Steam';
+      const status = element('small', 'active-status', account.activitySince && account.sessionConnected ? 'En ejecución' : 'En pausa / reconectando');
+      const stop = element('button', 'stop-session', 'Detener');
+      stop.type = 'button';
+      stop.disabled = busy.has('stop:' + account.id);
+      stop.addEventListener('click', () => void accountAction('stop:' + account.id, async () => {
+        const result = await request(accountPath(account.id) + '/stop', { method: 'POST' });
+        setToast('Juego detenido. Tiempo registrado: ' + durationText(result.activitySeconds));
+        await refresh();
+      }));
+      row.append(info, status, timer, stop);
+      return row;
+    }));
+    if (!active.length) target.append(element('p', 'muted', 'No hay sesiones de juego registradas.'));
+  }
   tickActivity();
+}
+function renderHistory() {
+  renderActiveSessions();
   const refreshed = asDate(currentAccount()?.syncedAt);
-  $('sync').textContent = refreshed ? 'Ãšltima sincronizaciÃ³n Â· ' + date.format(refreshed) : 'Sin sincronizar';
+  $('sync').textContent = refreshed ? 'Última sincronización · ' + date.format(refreshed) : 'Sin sincronizar';
   const history = currentData()?.history ?? [];
   $('logs').replaceChildren(...history.map(entry => {
     const row = element('li', 'log');
@@ -695,15 +703,15 @@ function renderHistory() {
     row.append(element('span', '', entry.text));
     return row;
   }));
-  if (!history.length) $('logs').append(element('li', 'muted', 'TodavÃ­a no hay actividad registrada.'));
+  if (!history.length) $('logs').append(element('li', 'muted', 'Todavía no hay actividad registrada.'));
 }
 
 function tickActivity() {
   for (const node of buttons('[data-since]')) {
     const start = Date.parse(node.dataset.since);
     if (!Number.isFinite(start)) continue;
-    const n = Math.max(0, Math.floor((Date.now() - start) / 1000));
-    node.textContent = [Math.floor(n/3600), Math.floor(n/60)%60, n%60].map(x => String(x).padStart(2,'0')).join(':');
+    const n = Number(node.dataset.elapsed || 0) + Math.max(0, Math.floor((Date.now() - start) / 1000));
+    node.textContent = durationText(n);
   }
 }
 window.setInterval(tickActivity, 1000);
@@ -758,7 +766,7 @@ function removeAccount() {
   if (!account) return;
   const dialog = $('removeDialog');
   dialog.returnValue = '';
-  $('removeMessage').textContent = 'Se eliminarÃ¡n la cuenta ' + account.name + ' y sus datos guardados en AuraBoost.';
+  $('removeMessage').textContent = 'Se eliminarán la cuenta ' + account.name + ' y sus datos guardados en AuraBoost.';
   dialog.addEventListener('close', () => {
     if (dialog.returnValue !== 'remove') return;
     void accountAction('remove', async () => {
@@ -784,10 +792,7 @@ function updateDraft() {
 }
 
 let imageFailed = false;
-$('steamButtonImage').addEventListener('error', () => {
-  imageFailed = true;
-  renderAccount();
-});
+
 
 $('loginForm').addEventListener('submit', event => {
   event.preventDefault();
@@ -826,7 +831,7 @@ $('recoveryForm').addEventListener('submit', event => {
     const result = await request('/api/auth/recovery', {
       method: 'POST', body: { email: $('recoveryEmail').value.trim() }, expire: false
     });
-    setAuthMessage('Si el correo corresponde a tu cuenta, vas a recibir un enlace de recuperaciÃ³n.');
+    setAuthMessage('Si el correo corresponde a tu cuenta, vas a recibir un enlace de recuperación.');
     if (session.mock && result.url) {
       const link = element('a', '', 'Abrir enlace simulado');
       link.href = safeNavigation(result.url, 'recovery');
@@ -841,7 +846,7 @@ $('passwordForm').addEventListener('submit', event => {
     const password = $('newPassword').value;
     $('newPassword').value = '';
     await request('/api/auth/password', { method: 'POST', body: { password } });
-    await bootstrap('ContraseÃ±a actualizada.');
+    await bootstrap('Contraseña actualizada.');
   });
 });
 
@@ -904,16 +909,35 @@ $('scan').addEventListener('click', () => {
     await request(accountPath(id) + '/sync', { method: 'POST' });
     await refresh();
     const status = details.get(id)?.account?.libraryStatus;
-    setToast(status === 'available' ? 'Biblioteca sincronizada.' : (accountStatuses[status] ?? 'SincronizaciÃ³n solicitada.'));
+    setToast(status === 'available' ? 'Biblioteca sincronizada.' : (accountStatuses[status] ?? 'Sincronización solicitada.'));
   });
 });
 
 $('linkSteam').addEventListener('click', () => { void linkAccount(); });
 $('removeAccount').addEventListener('click', removeAccount);
 
+function setLoginMode(mode) {
+  loginMode = mode;
+  $('manualMethod').setAttribute('aria-pressed', String(mode === 'manual'));
+  $('qrMethod').setAttribute('aria-pressed', String(mode === 'qr'));
+  $('sessionForm').hidden = mode !== 'manual';
+  $('qrInfo').hidden = mode !== 'qr';
+  $('steamPassword').value = '';
+}
+$('openSession').addEventListener('click', () => {
+  loginAccountId = selectedId;
+  setLoginMode('manual');
+  $('loginSteamDialog').showModal();
+});
+$('manualMethod').addEventListener('click', () => setLoginMode('manual'));
+$('qrMethod').addEventListener('click', () => setLoginMode('qr'));
+$('officialQR').addEventListener('click', () => void linkAccount());
+$('cancelLogin').addEventListener('click', () => $('loginSteamDialog').close());
+$('loginSteamDialog').addEventListener('close', () => { $('steamPassword').value = ''; });
+$('steamGuard').addEventListener('input', event => { event.target.value = event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10); });
 $('sessionForm').addEventListener('submit', event => {
   event.preventDefault();
-  const id = selectedId;
+  const id = loginAccountId ?? selectedId;
   if (!id) return;
   void accountAction('session:' + id, async () => {
     const result = await request(accountPath(id) + '/session', {
@@ -921,7 +945,7 @@ $('sessionForm').addEventListener('submit', event => {
     });
     $('steamPassword').value = '';
     guardLogin = result.status === 'guard' ? { accountId: id, loginId: result.loginId } : undefined;
-    setToast(result.status === 'guard' ? 'IngresÃ¡ el cÃ³digo de Steam Guard.' : 'SesiÃ³n de Steam conectada.');
+    setToast(result.status === 'guard' ? 'Ingresá el código de Steam Guard.' : 'Sesión de Steam conectada.');
     await refresh();
     if (result.status === 'guard') $('steamGuard').focus();
   });
@@ -933,7 +957,7 @@ $('guardForm').addEventListener('submit', event => {
   if (!id || !guardLogin) return;
   void accountAction('guard:' + id, async () => {
     const result = await request(accountPath(id) + '/session/guard', {
-      method: 'POST', body: { loginId: guardLogin.loginId, code: $('steamGuard').value.trim() }
+      method: 'POST', body: { loginId: guardLogin.loginId, code: $('steamGuard').value.trim().toUpperCase() }
     });
     $('steamGuard').value = '';
     guardLogin = result.status === 'guard' ? { accountId: id, loginId: result.loginId } : undefined;
@@ -948,7 +972,7 @@ $('unlinkSession').addEventListener('click', () => {
   if (!id) return;
   void accountAction('session:' + id, async () => {
     await request(accountPath(id) + '/session', { method: 'DELETE' });
-    setToast('SesiÃ³n desconectada.');
+    setToast('Sesión desconectada.');
     await refresh();
   });
 });
@@ -974,13 +998,13 @@ $('profileForm').addEventListener('submit', async event => {
   if (!name) return;
   const { selected, profiles } = configFor(selectedId);
   if (profiles.some(profile => profile.name.toLocaleLowerCase('es') === name.toLocaleLowerCase('es'))) {
-    setToast('Ya existe una selecciÃ³n con ese nombre.');
+    setToast('Ya existe una selección con ese nombre.');
     return;
   }
   const id = selectedId;
   if (await changeConfig({ profiles: [...profiles, { name, ids: selected }] })) {
     if (id === selectedId && input.value.trim() === name) input.value = '';
-    setToast('SelecciÃ³n guardada.');
+    setToast('Selección guardada.');
   }
 });
 
